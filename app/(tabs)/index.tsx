@@ -1,98 +1,146 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { compareAsc, isPast, isToday, parseISO } from 'date-fns';
+import { useRouter } from 'expo-router';
+import React, { useMemo } from 'react';
+import { Pressable, SectionList, StyleSheet, View } from 'react-native';
+import { CategoryGrid } from '../../src/components/CategoryGrid';
+import { DashboardStats } from '../../src/components/DashboardStats';
+import { EmptyState } from '../../src/components/EmptyState';
+import { GreetingHeader } from '../../src/components/GreetingHeader';
+import { Layout } from '../../src/components/Layout';
+import { ProductivityHeatmap } from '../../src/components/ProductivityHeatmap';
+import { ReminderCard } from '../../src/components/ReminderCard';
+import { ThemedText } from '../../src/components/ThemedText';
+import { Colors } from '../../src/constants/Colors';
+import { useStore } from '../../src/store/useStore';
+import { Reminder } from '../../src/types';
+import { formatDueTime } from '../../src/utils/date';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function TodayScreen() {
+  const reminders = useStore((state) => state.reminders);
+  const router = useRouter();
 
-export default function HomeScreen() {
+  const sections = useMemo(() => {
+    const activeReminders = reminders.filter(r => r.status === 'active' && !r.deleted_at);
+
+    const overdue: Reminder[] = [];
+    const today: Reminder[] = [];
+    const upcoming: Reminder[] = [];
+
+    activeReminders.forEach(r => {
+      const fireDate = parseISO(r.next_fire_at);
+      const now = new Date();
+
+      // Only show tasks that are due (past or today)
+      if (isPast(fireDate) && !isToday(fireDate)) {
+        overdue.push(r);
+      } else if (isToday(fireDate)) {
+        today.push(r);
+      } else {
+        // Future tasks go to upcoming
+        upcoming.push(r);
+      }
+    });
+
+    overdue.sort((a, b) => compareAsc(parseISO(a.next_fire_at), parseISO(b.next_fire_at)));
+    today.sort((a, b) => compareAsc(parseISO(a.next_fire_at), parseISO(b.next_fire_at)));
+    upcoming.sort((a, b) => compareAsc(parseISO(a.next_fire_at), parseISO(b.next_fire_at)));
+
+    const result = [];
+    if (overdue.length > 0) result.push({ title: 'Overdue', data: overdue, color: Colors.dark.error });
+    if (today.length > 0) result.push({ title: 'Today', data: today, color: Colors.dark.primary });
+    if (upcoming.length > 0) result.push({ title: 'Upcoming', data: upcoming, color: Colors.dark.textSecondary });
+
+    return result;
+  }, [reminders]);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <Layout>
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        ListHeaderComponent={
+          <View>
+            <GreetingHeader />
+            <DashboardStats />
+            <ProductivityHeatmap />
+            <CategoryGrid />
+          </View>
+        }
+        ListEmptyComponent={<EmptyState />}
+        renderSectionHeader={({ section: { title, color } }) => (
+          <ThemedText
+            variant="h2" // Larger header
+            weight="bold"
+            color={color}
+            style={{ marginTop: 24, marginBottom: 8, marginLeft: 20 }}
+          >
+            {title}
+          </ThemedText>
+        )}
+        renderItem={({ item, index, section }) => {
+          const isFirst = index === 0;
+          const isLast = index === section.data.length - 1;
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+          return (
+            <View style={{
+              backgroundColor: Colors.dark.surface,
+              marginHorizontal: 16,
+              borderTopLeftRadius: isFirst ? 12 : 0,
+              borderTopRightRadius: isFirst ? 12 : 0,
+              borderBottomLeftRadius: isLast ? 12 : 0,
+              borderBottomRightRadius: isLast ? 12 : 0,
+              overflow: 'hidden',
+            }}>
+              {(() => {
+                // All tasks are now one-time: completed if status='done'
+                const isCompletedForCurrentOccurrence = item.status === 'done';
+
+                return (
+                  <ReminderCard
+                    id={item.id}
+                    title={item.title}
+                    time={formatDueTime(item.next_fire_at)}
+                    isCompleted={isCompletedForCurrentOccurrence}
+                    onComplete={() => useStore.getState().completeReminder(item.id)}
+                    onDelete={() => useStore.getState().deleteReminder(item.id)}
+                    onEdit={() => router.push({ pathname: '/modal', params: { id: item.id } })}
+                  />
+                );
+              })()}
+              {!isLast && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: Colors.dark.border, marginLeft: 52 }} />}
+            </View>
+          );
+        }}
+        stickySectionHeadersEnabled={false}
+      />
+
+      <Pressable
+        style={styles.fab}
+        onPress={() => router.push('/modal')}
+      >
+        <Ionicons name="add" size={32} color="white" />
+      </Pressable>
+    </Layout>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  fab: {
     position: 'absolute',
-  },
+    bottom: 24,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.dark.primary, // System Blue
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: Colors.dark.primaryVibrant,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  }
 });

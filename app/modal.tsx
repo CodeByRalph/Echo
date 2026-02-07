@@ -1,29 +1,157 @@
-import { Link } from 'expo-router';
-import { StyleSheet } from 'react-native';
-
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { Ionicons } from '@expo/vector-icons';
+import RNDateTimePicker from '@react-native-community/datetimepicker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Button } from '../src/components/Button';
+import { Input } from '../src/components/Input';
+import { Layout } from '../src/components/Layout';
+import { ThemedText } from '../src/components/ThemedText';
+import { Colors } from '../src/constants/Colors';
+import { useStore } from '../src/store/useStore';
 
 export default function ModalScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title">This is a modal</ThemedText>
-      <Link href="/" dismissTo style={styles.link}>
-        <ThemedText type="link">Go to home screen</ThemedText>
-      </Link>
-    </ThemedView>
-  );
+    const params = useLocalSearchParams();
+    const id = typeof params.id === 'string' ? params.id : undefined;
+
+    const [title, setTitle] = useState('');
+    const [notes, setNotes] = useState('');
+    const [date, setDate] = useState(new Date());
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
+
+    const addReminder = useStore((state) => state.addReminder);
+    const updateReminder = useStore((state) => state.updateReminder);
+    const reminders = useStore((state) => state.reminders);
+    const categories = useStore((state) => state.categories);
+    const router = useRouter();
+
+    useEffect(() => {
+        if (id) {
+            const reminder = reminders.find(r => r.id === id);
+            if (reminder) {
+                setTitle(reminder.title);
+                setNotes(reminder.notes || '');
+                setDate(new Date(reminder.due_at));
+                setSelectedCategoryId(reminder.category_id);
+            }
+        }
+    }, [id]);
+
+    const handleSave = () => {
+        if (!title.trim()) return;
+
+        if (id) {
+            updateReminder(id, {
+                title,
+                notes,
+                due_at: date.toISOString(),
+                next_fire_at: date.toISOString(),
+                recurrence: { type: 'none', interval: 1 },
+                category_id: selectedCategoryId,
+            });
+        } else {
+            addReminder({
+                title,
+                notes,
+                status: 'active',
+                due_at: date.toISOString(),
+                next_fire_at: date.toISOString(),
+                recurrence: { type: 'none', interval: 1 },
+                category_id: selectedCategoryId,
+                version: 1,
+            });
+        }
+
+        router.back();
+    };
+
+    return (
+        <Layout>
+            <ScrollView contentContainerStyle={{ paddingVertical: 24, gap: 24 }}>
+
+                <View>
+                    <ThemedText variant="label" style={{ marginBottom: 8 }}>What needs doing?</ThemedText>
+                    <Input
+                        placeholder="Buy groceries..."
+                        value={title}
+                        onChangeText={setTitle}
+                    />
+                    <Input
+                        placeholder="Notes (optional)"
+                        value={notes}
+                        onChangeText={setNotes}
+                        multiline
+                        style={{ height: 80, textAlignVertical: 'top' }}
+                    />
+                </View>
+
+                <View>
+                    <ThemedText variant="label" style={{ marginBottom: 8 }}>When?</ThemedText>
+                    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                        <RNDateTimePicker
+                            value={date}
+                            mode="date"
+                            display="default"
+                            onChange={(e, d) => d && setDate(d)}
+                            themeVariant="dark"
+                            style={{ flex: 1 }}
+                        />
+                        <RNDateTimePicker
+                            value={date}
+                            mode="time"
+                            display="default"
+                            onChange={(e, d) => d && setDate(d)}
+                            themeVariant="dark"
+                            style={{ flex: 1 }}
+                        />
+                    </View>
+                </View>
+
+                <View>
+                    <ThemedText variant="label" style={{ marginBottom: 8 }}>List</ThemedText>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                        {categories.map(cat => (
+                            <TouchableOpacity
+                                key={cat.id}
+                                onPress={() => setSelectedCategoryId(cat.id)}
+                                style={[
+                                    styles.chip,
+                                    selectedCategoryId === cat.id && { backgroundColor: cat.color, borderColor: cat.color },
+                                    !selectedCategoryId && cat.isDefault && cat.id === 'default-work' && { borderColor: 'transparent' }
+                                ]}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name={cat.icon as any} size={16} color={selectedCategoryId === cat.id ? 'white' : cat.color} style={{ marginRight: 6 }} />
+                                    <ThemedText style={{ color: selectedCategoryId === cat.id ? 'white' : Colors.dark.textSecondary }}>
+                                        {cat.name}
+                                    </ThemedText>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+
+                <View style={{ marginTop: 32, gap: 12 }}>
+                    <Button title={id ? "Save Changes" : "Create Reminder"} onPress={handleSave} />
+                    <Button title="Cancel" variant="ghost" onPress={() => router.back()} />
+                </View>
+
+            </ScrollView>
+        </Layout>
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
-  },
+    chip: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: Colors.dark.surfaceHighlight,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    chipActive: {
+        backgroundColor: Colors.dark.primary,
+        borderColor: Colors.dark.primary,
+    }
 });

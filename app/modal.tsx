@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Button } from '../src/components/Button';
 import { Layout } from '../src/components/Layout';
 import { ThemedText } from '../src/components/ThemedText';
@@ -18,12 +19,14 @@ export default function ReminderModal() {
     const [dueTime, setDueTime] = useState(reminder ? new Date(reminder.next_fire_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '12:00');
     const [categoryId, setCategoryId] = useState<string | undefined>(reminder?.category_id || store.categories[0]?.id);
     const [householdId, setHouseholdId] = useState<string | undefined>(reminder?.household_id || undefined);
+    const [titleError, setTitleError] = useState(false);
 
     const handleSave = async () => {
         if (!title.trim()) {
-            Alert.alert("Required", "Please enter a title.");
+            setTitleError(true);
             return;
         }
+        setTitleError(false);
 
         // Parse time
         const [hours, minutes] = dueTime.split(':').map(Number);
@@ -58,81 +61,108 @@ export default function ReminderModal() {
         <Layout>
             <ScrollView contentContainerStyle={styles.container}>
                 <View style={styles.section}>
-                    <ThemedText variant="label" style={{ marginBottom: 8 }}>WHAT'S THE TASK?</ThemedText>
+                    <ThemedText variant="label" color={Colors.dark.textSecondary} style={{ marginBottom: 8, letterSpacing: 0.6 }}>WHAT'S THE TASK?</ThemedText>
                     <TextInput
                         style={styles.input}
                         placeholder="e.g. Call Mom"
                         placeholderTextColor={Colors.dark.textMuted}
                         value={title}
-                        onChangeText={setTitle}
+                        onChangeText={(value) => {
+                            setTitle(value);
+                            if (titleError) setTitleError(false);
+                        }}
                         autoFocus
                     />
+                    {titleError && (
+                        <ThemedText variant="caption" color={Colors.dark.textSecondary} style={{ marginTop: 8 }}>
+                            Add a short title to continue.
+                        </ThemedText>
+                    )}
                 </View>
 
                 <View style={styles.section}>
-                    <ThemedText variant="label" style={{ marginBottom: 8 }}>TIME</ThemedText>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="12:00"
-                        placeholderTextColor={Colors.dark.textMuted}
-                        value={dueTime}
-                        onChangeText={setDueTime}
-                    />
+                    <ThemedText variant="label" color={Colors.dark.textSecondary} style={{ marginBottom: 8, letterSpacing: 0.6 }}>WHEN</ThemedText>
+                    <View style={styles.pillRow}>
+                        <View style={styles.pill}>
+                            <Ionicons name="calendar-outline" size={16} color={Colors.dark.textSecondary} />
+                            <ThemedText style={{ marginLeft: 8 }}>Today</ThemedText>
+                        </View>
+                        <View style={styles.pill}>
+                            <Ionicons name="time-outline" size={16} color={Colors.dark.textSecondary} />
+                            <TextInput
+                                style={styles.pillInput}
+                                placeholder="12:00"
+                                placeholderTextColor={Colors.dark.textMuted}
+                                value={dueTime}
+                                onChangeText={setDueTime}
+                            />
+                        </View>
+                    </View>
                 </View>
 
                 <View style={styles.section}>
-                    <ThemedText variant="label" style={{ marginBottom: 12 }}>CATEGORY</ThemedText>
+                    <ThemedText variant="label" color={Colors.dark.textSecondary} style={{ marginBottom: 12, letterSpacing: 0.6 }}>LIST</ThemedText>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
                         {store.categories.map(cat => (
-                            <TouchableOpacity
+                            <Pressable
                                 key={cat.id}
-                                style={[
+                                style={({ pressed }) => [
                                     styles.categoryBadge,
                                     categoryId === cat.id && { backgroundColor: cat.color + '40' },
-                                    categoryId === cat.id && { borderColor: cat.color }
+                                    categoryId === cat.id && { borderColor: cat.color },
+                                    pressed && { transform: [{ scale: 0.98 }] }
                                 ]}
                                 onPress={() => setCategoryId(cat.id)}
                             >
                                 <Ionicons name={cat.icon as any || 'folder-outline'} size={18} color={cat.color} />
                                 <ThemedText style={{ marginLeft: 6, color: cat.color }}>{cat.name}</ThemedText>
-                            </TouchableOpacity>
+                            </Pressable>
                         ))}
                     </ScrollView>
                 </View>
 
                 {store.households.length > 0 && (
                     <View style={styles.section}>
-                        <ThemedText variant="label" style={{ marginBottom: 12 }}>SHARE WITH FAMILY?</ThemedText>
+                        <ThemedText variant="label" color={Colors.dark.textSecondary} style={{ marginBottom: 12, letterSpacing: 0.6 }}>SHARE WITH FAMILY</ThemedText>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
-                            <TouchableOpacity
-                                style={[
+                            <Pressable
+                                style={({ pressed }) => [
                                     styles.categoryBadge,
                                     householdId === undefined && { backgroundColor: Colors.dark.surfaceHighlight },
+                                    pressed && { transform: [{ scale: 0.98 }] }
                                 ]}
                                 onPress={() => setHouseholdId(undefined)}
                             >
                                 <ThemedText color={householdId === undefined ? Colors.dark.text : Colors.dark.textSecondary}>Private</ThemedText>
-                            </TouchableOpacity>
+                            </Pressable>
                             {store.households.map(h => (
-                                <TouchableOpacity
+                                <Pressable
                                     key={h.id}
-                                    style={[
+                                    style={({ pressed }) => [
                                         styles.categoryBadge,
                                         householdId === h.id && { backgroundColor: Colors.dark.primary + '40' },
-                                        householdId === h.id && { borderColor: Colors.dark.primary }
+                                        householdId === h.id && { borderColor: Colors.dark.primary },
+                                        pressed && { transform: [{ scale: 0.98 }] }
                                     ]}
                                     onPress={() => setHouseholdId(h.id)}
                                 >
                                     <Ionicons name="home-outline" size={18} color={householdId === h.id ? Colors.dark.primary : Colors.dark.textSecondary} />
                                     <ThemedText style={{ marginLeft: 6, color: householdId === h.id ? Colors.dark.primary : Colors.dark.textSecondary }}>{h.name}</ThemedText>
-                                </TouchableOpacity>
+                                </Pressable>
                             ))}
                         </ScrollView>
                     </View>
                 )}
 
                 <View style={{ marginTop: 24 }}>
-                    <Button title={id ? "Save Changes" : "Add Reminder"} onPress={handleSave} />
+                    <Button
+                        title={id ? "Save Changes" : "Add Reminder"}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+                            handleSave();
+                        }}
+                        style={styles.cta}
+                    />
                     <Button title="Cancel" variant="ghost" onPress={() => router.back()} style={{ marginTop: 8 }} />
                 </View>
             </ScrollView>
@@ -142,17 +172,19 @@ export default function ReminderModal() {
 
 const styles = StyleSheet.create({
     container: {
-        padding: 20,
+        padding: 18,
     },
     section: {
-        marginBottom: 24,
+        marginBottom: 18,
     },
     input: {
-        backgroundColor: Colors.dark.surface,
-        borderRadius: 12,
+        backgroundColor: Colors.dark.surfaceElevated,
+        borderRadius: 16,
         padding: 16,
         color: Colors.dark.text,
         fontSize: 18,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
     },
     categoryRow: {
         flexDirection: 'row',
@@ -162,9 +194,38 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 10,
-        borderRadius: 20,
+        borderRadius: 18,
         borderWidth: 1,
-        borderColor: Colors.dark.surfaceHighlight,
+        borderColor: 'rgba(255,255,255,0.08)',
         marginRight: 10,
+    },
+    pillRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    pill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 18,
+        backgroundColor: Colors.dark.surfaceElevated,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+    },
+    pillInput: {
+        marginLeft: 8,
+        color: Colors.dark.text,
+        fontSize: 16,
+        minWidth: 70,
+    },
+    cta: {
+        shadowColor: Colors.dark.glow,
+        shadowOpacity: 0.35,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.12)',
     }
 });

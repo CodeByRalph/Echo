@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import React from 'react';
-import { ActionSheetIOS, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { BlurredBottomSheet } from './BlurredBottomSheet';
 import { Colors } from '../constants/Colors';
 import { useStore } from '../store/useStore';
 import { Avatar } from './Avatar';
@@ -23,6 +24,10 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
     const currentHousehold = useStore(state => state.currentHousehold);
     const userId = useStore(state => state.userId);
     const nagMember = useStore(state => state.nagMember);
+    const [showActions, setShowActions] = useState(false);
+    const [showSnooze, setShowSnooze] = useState(false);
+    const [showReschedulePrompt, setShowReschedulePrompt] = useState(false);
+    const [showNudgeNotice, setShowNudgeNotice] = useState(false);
 
     // Resolve Assignee
     const assignee = householdId && assigneeId && currentHousehold?.members
@@ -38,32 +43,7 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
 
     const showActionMenu = () => {
         Haptics.selectionAsync();
-
-        if (Platform.OS === 'ios') {
-            ActionSheetIOS.showActionSheetWithOptions(
-                {
-                    options: ['Cancel', 'Edit Details', 'Delete'],
-                    destructiveButtonIndex: 2,
-                    cancelButtonIndex: 0,
-                    userInterfaceStyle: 'dark',
-                },
-                (buttonIndex) => {
-                    if (buttonIndex === 1) onEdit();
-                    if (buttonIndex === 2) onDelete();
-                }
-            );
-        } else {
-            Alert.alert(
-                'Task Options',
-                title,
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Snooze', onPress: handleSnooze }, // Added Snooze
-                    { text: 'Edit', onPress: onEdit },
-                    { text: 'Delete', onPress: onDelete, style: 'destructive' },
-                ]
-            );
-        }
+        setShowActions(true);
     };
 
     const handleSnooze = () => {
@@ -78,51 +58,15 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
         if (!reminder) return;
 
         const snoozeCount = reminder.snooze_count || 0;
-
         if (snoozeCount >= 2) {
-            // Adaptive Nudge
-            const suggestedTime = new Date();
-            suggestedTime.setHours(suggestedTime.getHours() + 2); // Mock logic: +2 hours
-            const timeString = suggestedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            Alert.alert(
-                "You've snoozed this a few times.",
-                `You usually complete tasks like this around ${timeString}. Want to reschedule?`,
-                [
-                    {
-                        text: 'Yes, Reschedule',
-                        onPress: () => {
-                            state.updateReminder(id, {
-                                due_at: suggestedTime.toISOString(),
-                                next_fire_at: suggestedTime.toISOString(),
-                                snooze_count: 0 // Reset on meaningful reschedule
-                            });
-                        }
-                    },
-                    {
-                        text: 'No, just snooze',
-                        style: 'cancel',
-                        onPress: showStandardSnoozeOptions
-                    }
-                ]
-            );
+            setShowReschedulePrompt(true);
         } else {
             showStandardSnoozeOptions();
         }
     };
 
     const showStandardSnoozeOptions = () => {
-        const state = require('../store/useStore').useStore.getState();
-        Alert.alert(
-            'Snooze until...',
-            undefined,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { text: '10 Minutes', onPress: () => state.snoozeReminder(id, 10) },
-                { text: '1 Hour', onPress: () => state.snoozeReminder(id, 60) },
-                { text: 'Tomorrow', onPress: () => state.snoozeReminder(id, 1440) }, // Simple +24h
-            ]
-        );
+        setShowSnooze(true);
     }
 
 
@@ -138,12 +82,16 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
     };
 
     return (
+        <>
         <View style={styles.container}>
             <View style={styles.row}>
                 {/* Main Tap Area: Complete Task */}
                 <Pressable
                     onPress={handleComplete}
-                    style={({ pressed }) => [styles.mainTouchArea, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [
+                        styles.mainTouchArea,
+                        pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 }
+                    ]}
                 >
                     <View style={[styles.checkboxBase, isCompleted && styles.checkboxChecked]}>
                         {isCompleted && <Ionicons name="checkmark" size={16} color={Colors.dark.background} />}
@@ -188,8 +136,8 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
                             style={({ pressed }) => [styles.nagButton, pressed && { opacity: 0.7 }]}
                             onPress={() => {
                                 nagMember(id);
-                                Alert.alert("Nudge Sent!", `${assigneeName} has been notified.`);
                                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                                setShowNudgeNotice(true);
                             }}
                         >
                             <Ionicons name="notifications-outline" size={14} color={Colors.dark.primary} />
@@ -201,6 +149,61 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
                 </View>
             )}
         </View>
+        <BlurredBottomSheet
+            visible={showActions}
+            onClose={() => setShowActions(false)}
+            title="Task options"
+            subtitle={title}
+            actions={[
+                { label: 'Snooze', tone: 'accent', onPress: () => { setShowActions(false); handleSnooze(); } },
+                { label: 'Edit details', onPress: () => { setShowActions(false); onEdit(); } },
+                { label: 'Delete reminder', tone: 'destructive', onPress: () => { setShowActions(false); onDelete(); } }
+            ]}
+        />
+        <BlurredBottomSheet
+            visible={showSnooze}
+            onClose={() => setShowSnooze(false)}
+            title="Snooze until"
+            actions={[
+                { label: '10 minutes', onPress: () => { setShowSnooze(false); useStore.getState().snoozeReminder(id, 10); } },
+                { label: '1 hour', onPress: () => { setShowSnooze(false); useStore.getState().snoozeReminder(id, 60); } },
+                { label: 'Tomorrow', onPress: () => { setShowSnooze(false); useStore.getState().snoozeReminder(id, 1440); } }
+            ]}
+        />
+        <BlurredBottomSheet
+            visible={showReschedulePrompt}
+            onClose={() => setShowReschedulePrompt(false)}
+            title="You're snoozing often"
+            subtitle="Want to reschedule instead?"
+            actions={[
+                {
+                    label: 'Reschedule +2 hours',
+                    tone: 'accent',
+                    onPress: () => {
+                        const suggestedTime = new Date();
+                        suggestedTime.setHours(suggestedTime.getHours() + 2);
+                        useStore.getState().updateReminder(id, {
+                            due_at: suggestedTime.toISOString(),
+                            next_fire_at: suggestedTime.toISOString(),
+                            snooze_count: 0
+                        });
+                        setShowReschedulePrompt(false);
+                    }
+                },
+                {
+                    label: 'Just snooze',
+                    onPress: () => { setShowReschedulePrompt(false); setShowSnooze(true); }
+                }
+            ]}
+        />
+        <BlurredBottomSheet
+            visible={showNudgeNotice}
+            onClose={() => setShowNudgeNotice(false)}
+            title="Nudge sent"
+            subtitle={`${assigneeName} has been notified.`}
+            actions={[{ label: 'Done', onPress: () => setShowNudgeNotice(false) }]}
+        />
+        </>
     );
 }
 
@@ -208,18 +211,25 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: 8,
-        marginHorizontal: 16,
-        borderRadius: 16,
-        backgroundColor: Colors.dark.surface,
+        marginBottom: 12,
+        marginHorizontal: 12,
+        borderRadius: 20,
+        backgroundColor: Colors.dark.surfaceElevated,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+        shadowColor: Colors.dark.shadow,
+        shadowOpacity: 0.35,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 10 },
+        elevation: 10,
         overflow: 'hidden',
     },
     row: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 16,
-        backgroundColor: Colors.dark.surface,
+        paddingVertical: 18,
+        paddingHorizontal: 18,
+        backgroundColor: 'transparent',
     },
     mainTouchArea: {
         flex: 1,
@@ -276,7 +286,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 10,
         paddingVertical: 6,
-        backgroundColor: Colors.dark.surfaceHighlight,
+        backgroundColor: 'rgba(147,197,253,0.12)',
         borderRadius: 12,
     }
 });

@@ -1,12 +1,18 @@
 export const Colors = {
     dark: {
-        background: '#121212', // Deep Charcoal (Beckman Style)
-        surface: '#1E1E24',    // Soft Slate
-        surfaceHighlight: '#2A2A35', // Lighter Slate
+        background: '#0B0C10', // Deep midnight charcoal
+        surface: '#151820',    // Soft slate base
+        surfaceHighlight: '#232634', // Lighter slate
+        surfaceElevated: '#1B1F2A',
+        glass: 'rgba(255, 255, 255, 0.06)',
+        glassStrong: 'rgba(255, 255, 255, 0.12)',
+        innerShadow: 'rgba(0, 0, 0, 0.35)',
+        glow: 'rgba(147, 197, 253, 0.22)',
+        bloom: 'rgba(147, 197, 253, 0.14)',
 
-        text: '#FFFFFF',       // Primary Text
-        textSecondary: '#A1A1AA', // Neutral Gray
-        textMuted: '#52525B',  // Zinc 600
+        text: '#FFFFFF',       // Primary text
+        textSecondary: 'rgba(255, 255, 255, 0.74)',
+        textMuted: 'rgba(255, 255, 255, 0.46)',
 
         primary: '#93C5FD',    // Pastel Blue (Tailwind Blue 300)
         primaryVibrant: '#60A5FA', // Blue 400
@@ -14,10 +20,10 @@ export const Colors = {
         accent: '#FDBA74',     // Pastel Orange (Peach)
         success: '#6EE7B7',    // Pastel Mint
         warning: '#FCD34D',    // Pastel Yellow
-        error: '#F87171',      // Pastel Red
+        error: '#FCA5A5',      // Softer red
 
         border: '#27272A',     // Zinc 800
-        glass: 'rgba(255, 255, 255, 0.05)', // Glassmorphism
+        shadow: 'rgba(7, 9, 14, 0.6)',
     },
     // Light mode placeholder
     light: {

@@ -33,6 +33,7 @@ export function Button({ onPress, title, variant = 'primary', loading, disabled,
             style={({ pressed }) => [
                 styles.container,
                 { backgroundColor: getBackgroundColor(pressed) },
+                pressed && { transform: [{ scale: 0.98 }] },
                 style
             ]}
         >

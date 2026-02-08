@@ -43,7 +43,7 @@ export default function AllScreen() {
                     </View>
                 }
                 renderSectionHeader={({ section: { title } }) => (
-                    <ThemedText variant="h3" weight="bold" color={Colors.dark.textSecondary} style={styles.sectionHeader}>
+                    <ThemedText variant="h2" weight="semibold" color={Colors.dark.textSecondary} style={styles.sectionHeader}>
                         {title}
                     </ThemedText>
                 )}
@@ -67,19 +67,19 @@ export default function AllScreen() {
 
 const styles = StyleSheet.create({
     header: {
-        marginTop: 20,
-        marginBottom: 24,
-        paddingHorizontal: 20,
+        marginTop: 16,
+        marginBottom: 18,
+        paddingHorizontal: 12,
     },
     backButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 12,
     },
     sectionHeader: {
-        marginTop: 16,
-        marginBottom: 8,
-        marginLeft: 20,
+        marginTop: 20,
+        marginBottom: 10,
+        marginLeft: 18,
     },
     item: {
         flexDirection: 'row',

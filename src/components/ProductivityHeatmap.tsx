@@ -1,6 +1,6 @@
 import { eachDayOfInterval, format, subDays } from 'date-fns';
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { useStore } from '../store/useStore';
 import { ThemedText } from './ThemedText';
@@ -15,36 +15,60 @@ export function ProductivityHeatmap() {
 
     // Determine color based on count
     const getColor = (count: number) => {
-        if (count === 0) return Colors.dark.surfaceHighlight;
-        if (count <= 2) return Colors.dark.primary + '60'; // 40% opacity
-        if (count <= 4) return Colors.dark.primary + '90'; // 60% opacity
-        return Colors.dark.primary; // Full opacity
+        if (count === 0) return 'rgba(255,255,255,0.06)';
+        if (count <= 2) return 'rgba(147,197,253,0.28)';
+        if (count <= 4) return 'rgba(147,197,253,0.46)';
+        return 'rgba(147,197,253,0.72)';
+    };
+
+    const HeatCell = ({ count }: { count: number }) => {
+        const scale = useRef(new Animated.Value(1)).current;
+        const opacity = useRef(new Animated.Value(count === 0 ? 0.4 : 1)).current;
+        const backgroundColor = useMemo(() => getColor(count), [count]);
+
+        useEffect(() => {
+            Animated.timing(opacity, {
+                toValue: count === 0 ? 0.4 : 1,
+                duration: 240,
+                useNativeDriver: true,
+            }).start();
+
+            if (count > 0) {
+                Animated.sequence([
+                    Animated.timing(scale, { toValue: 1.06, duration: 140, useNativeDriver: true }),
+                    Animated.timing(scale, { toValue: 1, duration: 180, useNativeDriver: true }),
+                ]).start();
+            }
+        }, [count, opacity, scale]);
+
+        return (
+            <Animated.View
+                style={[
+                    styles.cell,
+                    { backgroundColor, opacity, transform: [{ scale }] }
+                ]}
+            />
+        );
     };
 
     return (
         <View style={styles.container}>
-            <ThemedText variant="h3" weight="bold" style={styles.header}>Productivity</ThemedText>
+            <ThemedText variant="h2" weight="semibold" style={styles.header}>Productivity</ThemedText>
             <View style={styles.grid}>
                 {dates.map((date) => {
                     const key = format(date, 'yyyy-MM-dd');
                     const count = activity[key] || 0;
                     return (
-                        <View
-                            key={key}
-                            style={[
-                                styles.cell,
-                                { backgroundColor: getColor(count) }
-                            ]}
-                        />
+                        <HeatCell key={key} count={count} />
                     );
                 })}
             </View>
             <View style={styles.legend}>
                 <ThemedText variant="caption" color={Colors.dark.textSecondary}>Less</ThemedText>
-                <View style={[styles.legendCell, { backgroundColor: Colors.dark.surfaceHighlight }]} />
-                <View style={[styles.legendCell, { backgroundColor: Colors.dark.primary + '60' }]} />
-                <View style={[styles.legendCell, { backgroundColor: Colors.dark.primary + '90' }]} />
-                <View style={[styles.legendCell, { backgroundColor: Colors.dark.primary }]} />
+                <View style={[styles.legendCell, { backgroundColor: 'rgba(255,255,255,0.06)' }]} />
+                <View style={[styles.legendCell, { backgroundColor: 'rgba(147,197,253,0.28)' }]} />
+                <View style={[styles.legendCell, { backgroundColor: 'rgba(147,197,253,0.46)' }]} />
+                <View style={[styles.legendCell, { backgroundColor: 'rgba(147,197,253,0.72)' }]} />
                 <ThemedText variant="caption" color={Colors.dark.textSecondary}>More</ThemedText>
             </View>
         </View>
@@ -53,7 +77,7 @@ export function ProductivityHeatmap() {
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: 24,
+        marginBottom: 32,
         paddingHorizontal: 20,
     },
     header: {
@@ -62,17 +86,17 @@ const styles = StyleSheet.create({
     grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 4,
-        height: 120, // Constrain height to force wrapping into rows (or use column wrap trick)
+        gap: 6,
+        height: 126,
         // Actually, for a heatmap, we usually want Columns = Weeks, Rows = Days.
         // Flex wrap defaults to wrapping rows. 
         // Trick: Rotate container -90deg? Or just map by columns.
         // Simplifying for MVP: Just a grid of squares left-to-right.
     },
     cell: {
-        width: 12,
-        height: 12,
-        borderRadius: 2,
+        width: 10,
+        height: 10,
+        borderRadius: 3,
     },
     legend: {
         flexDirection: 'row',

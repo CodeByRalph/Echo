@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { BlurredBottomSheet } from './BlurredBottomSheet';
 import { Colors } from '../constants/Colors';
 import { useStore } from '../store/useStore';
 import { Category } from '../types';
@@ -14,6 +15,7 @@ export function CategoryGrid() {
     const togglePro = useStore((state) => state.togglePro); // Temp for demo
     const currentHousehold = useStore((state) => state.currentHousehold);
     const router = useRouter();
+    const [showProSheet, setShowProSheet] = useState(false);
 
     // Calculate counts
     const getCount = (catId: string) => {
@@ -25,29 +27,26 @@ export function CategoryGrid() {
 
     const handleNewCategory = () => {
         if (!isPro) {
-            Alert.alert(
-                "Upgrade to Pro",
-                "Create unlimited custom lists, unlock icons, and more!",
-                [
-                    { text: "Maybe Later", style: "cancel" },
-                    { text: "Upgrade Now", onPress: () => router.push('/paywall') }
-                ]
-            );
+            setShowProSheet(true);
         } else {
             router.push('/category/create');
         }
     };
 
     const CategoryCard = ({ category }: { category: Category }) => (
-        <TouchableOpacity style={styles.card} onPress={() => router.push(`/category/${category.id}`)}>
-            <View style={[styles.iconContainer, { backgroundColor: category.color }]}>
-                <Ionicons name={category.icon as any || 'list'} size={18} color="white" />
+        <Pressable
+            style={({ pressed }) => [styles.card, pressed && { transform: [{ scale: 0.98 }] }]}
+            onPress={() => router.push(`/category/${category.id}`)}
+        >
+            <View style={[styles.iconContainer, { backgroundColor: category.color + '22' }]}>
+                <Ionicons name={category.icon as any || 'list'} size={16} color={category.color} />
             </View>
             <View style={styles.content}>
-                <ThemedText weight="bold" style={styles.name}>{category.name}</ThemedText>
-                <ThemedText variant="caption" color={Colors.dark.textSecondary}>{getCount(category.id)}</ThemedText>
+                <ThemedText weight="semibold" style={styles.name}>{category.name}</ThemedText>
+                <ThemedText variant="h2" weight="semibold" style={styles.count}>{getCount(category.id)}</ThemedText>
+                <ThemedText variant="caption" color={Colors.dark.textSecondary}>active</ThemedText>
             </View>
-        </TouchableOpacity>
+        </Pressable>
     );
 
     return (
@@ -55,17 +54,17 @@ export function CategoryGrid() {
             {/* Family Section (Separate) */}
             {currentHousehold && (
                 <View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
-                    <ThemedText variant="h3" weight="bold" style={{ marginBottom: 12 }}>Family Space</ThemedText>
+                    <ThemedText variant="h2" weight="semibold" style={{ marginBottom: 12 }}>Family Space</ThemedText>
                     <TouchableOpacity
                         style={[styles.card, styles.familyCard]}
                         onPress={() => router.push('/category/family-household')}
                     >
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <View style={[styles.iconContainer, { backgroundColor: Colors.dark.accent, width: 40, height: 40, borderRadius: 20 }]}>
-                                <Ionicons name="people" size={24} color="white" />
+                            <View style={[styles.iconContainer, { backgroundColor: Colors.dark.accent + '22', width: 44, height: 44, borderRadius: 22 }]}>
+                                <Ionicons name="people" size={20} color={Colors.dark.accent} />
                             </View>
                             <View style={{ marginLeft: 12 }}>
-                                <ThemedText weight="bold" style={styles.name}>{currentHousehold.name}</ThemedText>
+                                <ThemedText weight="semibold" style={styles.name}>{currentHousehold.name}</ThemedText>
                                 <ThemedText variant="caption" color={Colors.dark.textSecondary}>
                                     {getCount('family-household')} active tasks
                                 </ThemedText>
@@ -77,19 +76,19 @@ export function CategoryGrid() {
             )}
 
             {/* Other Categories */}
-            <ThemedText variant="h3" weight="bold" style={{ marginBottom: 12, paddingHorizontal: 20 }}>Lists</ThemedText>
+            <ThemedText variant="h2" weight="semibold" style={{ marginBottom: 12, paddingHorizontal: 20 }}>Lists</ThemedText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 {categories.map(cat => (
                     <CategoryCard key={cat.id} category={cat} />
                 ))}
 
                 {/* New List Button */}
-                <TouchableOpacity style={[styles.card, styles.newCard]} onPress={handleNewCategory}>
+                <Pressable style={({ pressed }) => [styles.card, styles.newCard, pressed && { transform: [{ scale: 0.98 }] }]} onPress={handleNewCategory}>
                     <View style={[styles.iconContainer, { backgroundColor: Colors.dark.surfaceHighlight }]}>
                         <Ionicons name="add" size={20} color={Colors.dark.text} />
                     </View>
                     <ThemedText weight="medium" style={styles.name}>New</ThemedText>
-                </TouchableOpacity>
+                </Pressable>
             </ScrollView>
 
             {!isPro && (
@@ -97,6 +96,16 @@ export function CategoryGrid() {
                     <ThemedText variant="caption" color={Colors.dark.textMuted} style={{ fontSize: 10 }}>(Dev: Toggle Pro)</ThemedText>
                 </TouchableOpacity>
             )}
+            <BlurredBottomSheet
+                visible={showProSheet}
+                onClose={() => setShowProSheet(false)}
+                title="Upgrade to Echo Pro"
+                subtitle="Unlock unlimited lists, icons, and family spaces."
+                actions={[
+                    { label: 'Maybe later', onPress: () => setShowProSheet(false) },
+                    { label: 'Upgrade now', tone: 'accent', onPress: () => { setShowProSheet(false); router.push('/paywall'); } }
+                ]}
+            />
         </View>
     );
 }
@@ -107,15 +116,22 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 20,
-        gap: 12,
+        gap: 14,
     },
     card: {
-        width: 100,
-        height: 100,
-        backgroundColor: Colors.dark.surface,
-        borderRadius: 16,
-        padding: 12,
+        width: 104,
+        height: 132,
+        backgroundColor: Colors.dark.surfaceElevated,
+        borderRadius: 20,
+        padding: 16,
         justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+        shadowColor: Colors.dark.shadow,
+        shadowOpacity: 0.35,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 8,
     },
     familyCard: {
         width: '100%',
@@ -126,11 +142,11 @@ const styles = StyleSheet.create({
     },
     newCard: {
         borderWidth: 1,
-        borderColor: Colors.dark.border,
-        backgroundColor: 'transparent',
+        borderColor: Colors.dark.surfaceHighlight,
+        backgroundColor: Colors.dark.surface,
         alignItems: 'center',
         justifyContent: 'center',
-        borderStyle: 'dashed',
+        borderStyle: 'solid',
     },
     iconContainer: {
         width: 32,
@@ -144,5 +160,9 @@ const styles = StyleSheet.create({
     },
     name: {
         fontSize: 14,
+    },
+    count: {
+        marginTop: 6,
+        color: Colors.dark.text,
     }
 });

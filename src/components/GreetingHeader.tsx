@@ -5,6 +5,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { ProBadge } from './ProBadge';
 import { ThemedText } from './ThemedText';
+import { useStore } from '../store/useStore';
 
 export function GreetingHeader() {
     // Apple Reminders often just uses "Today" or the List Name as the large title
@@ -15,6 +16,7 @@ export function GreetingHeader() {
     else if (hours < 18) greeting = 'Good Afternoon';
 
     const router = useRouter();
+    const isPro = useStore(state => state.isPro);
 
     return (
         <View style={styles.container}>
@@ -23,7 +25,7 @@ export function GreetingHeader() {
                     <ThemedText variant="h1" weight="bold" style={styles.title}>
                         {greeting}
                     </ThemedText>
-                    <ProBadge />
+                    {isPro && <ProBadge />}
                 </View>
                 <TouchableOpacity onPress={() => router.push('/account')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                     <Ionicons name="person-circle-outline" size={32} color={Colors.dark.primary} />

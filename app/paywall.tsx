@@ -28,13 +28,21 @@ export default function PaywallScreen() {
     const handlePurchase = async (pack: PurchasesPackage) => {
         setLoading(true);
         try {
-            await PurchaseService.purchasePackage(pack);
-            // Store update handles isPro state
-            await useStore.getState().checkProStatus();
-            Alert.alert("Success", "Welcome to Pro!");
-            router.back();
-        } catch (e) {
-            Alert.alert("Error", "Purchase failed or cancelled.");
+            const success = await PurchaseService.purchasePackage(pack);
+            
+            if (success) {
+                // Refresh pro status to sync with RevenueCat
+                await useStore.getState().checkProStatus();
+                Alert.alert("Success", "Welcome to Pro!");
+                router.back();
+            } else {
+                Alert.alert("Payment Failed", "The purchase could not be completed. Please try again.");
+            }
+        } catch (e: any) {
+            // Only show error if user didn't cancel
+            if (!e.userCancelled) {
+                Alert.alert("Payment Failed", "The purchase could not be completed. Please try again.");
+            }
         } finally {
             setLoading(false);
         }

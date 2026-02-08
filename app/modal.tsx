@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Button } from '../src/components/Button';
 import { Layout } from '../src/components/Layout';
 import { ThemedText } from '../src/components/ThemedText';
@@ -16,10 +17,21 @@ export default function ReminderModal() {
     const reminder = id ? store.reminders.find(r => r.id === id) : null;
 
     const [title, setTitle] = useState(reminder?.title || '');
-    const [dueTime, setDueTime] = useState(reminder ? new Date(reminder.next_fire_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '12:00');
+    const [dueDate, setDueDate] = useState(reminder ? new Date(reminder.next_fire_at) : new Date());
     const [categoryId, setCategoryId] = useState<string | undefined>(reminder?.category_id || store.categories[0]?.id);
     const [householdId, setHouseholdId] = useState<string | undefined>(reminder?.household_id || undefined);
     const [titleError, setTitleError] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showTimePicker, setShowTimePicker] = useState(false);
+
+    const formattedDate = useMemo(
+        () => dueDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }),
+        [dueDate]
+    );
+    const formattedTime = useMemo(
+        () => dueDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true }),
+        [dueDate]
+    );
 
     const handleSave = async () => {
         if (!title.trim()) {
@@ -28,11 +40,7 @@ export default function ReminderModal() {
         }
         setTitleError(false);
 
-        // Parse time
-        const [hours, minutes] = dueTime.split(':').map(Number);
-        const nextFire = new Date();
-        nextFire.setHours(hours, minutes, 0, 0);
-        if (nextFire < new Date()) nextFire.setDate(nextFire.getDate() + 1);
+        const nextFire = new Date(dueDate);
 
         if (id) {
             store.updateReminder(id, {
@@ -83,20 +91,14 @@ export default function ReminderModal() {
                 <View style={styles.section}>
                     <ThemedText variant="label" color={Colors.dark.textSecondary} style={{ marginBottom: 8, letterSpacing: 0.6 }}>WHEN</ThemedText>
                     <View style={styles.pillRow}>
-                        <View style={styles.pill}>
+                        <Pressable style={styles.pill} onPress={() => setShowDatePicker(true)}>
                             <Ionicons name="calendar-outline" size={16} color={Colors.dark.textSecondary} />
-                            <ThemedText style={{ marginLeft: 8 }}>Today</ThemedText>
-                        </View>
-                        <View style={styles.pill}>
+                            <ThemedText style={{ marginLeft: 8 }}>{formattedDate}</ThemedText>
+                        </Pressable>
+                        <Pressable style={styles.pill} onPress={() => setShowTimePicker(true)}>
                             <Ionicons name="time-outline" size={16} color={Colors.dark.textSecondary} />
-                            <TextInput
-                                style={styles.pillInput}
-                                placeholder="12:00"
-                                placeholderTextColor={Colors.dark.textMuted}
-                                value={dueTime}
-                                onChangeText={setDueTime}
-                            />
-                        </View>
+                            <ThemedText style={{ marginLeft: 8 }}>{formattedTime}</ThemedText>
+                        </Pressable>
                     </View>
                 </View>
 
@@ -166,6 +168,36 @@ export default function ReminderModal() {
                     <Button title="Cancel" variant="ghost" onPress={() => router.back()} style={{ marginTop: 8 }} />
                 </View>
             </ScrollView>
+            {showDatePicker && (
+                <DateTimePicker
+                    value={dueDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                    onChange={(event, selectedDate) => {
+                        setShowDatePicker(Platform.OS === 'ios');
+                        if (selectedDate) {
+                            const updated = new Date(dueDate);
+                            updated.setFullYear(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+                            setDueDate(updated);
+                        }
+                    }}
+                />
+            )}
+            {showTimePicker && (
+                <DateTimePicker
+                    value={dueDate}
+                    mode="time"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event, selectedDate) => {
+                        setShowTimePicker(Platform.OS === 'ios');
+                        if (selectedDate) {
+                            const updated = new Date(dueDate);
+                            updated.setHours(selectedDate.getHours(), selectedDate.getMinutes(), 0, 0);
+                            setDueDate(updated);
+                        }
+                    }}
+                />
+            )}
         </Layout>
     );
 }
@@ -212,12 +244,6 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.dark.surfaceElevated,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.06)',
-    },
-    pillInput: {
-        marginLeft: 8,
-        color: Colors.dark.text,
-        fontSize: 16,
-        minWidth: 70,
     },
     cta: {
         shadowColor: Colors.dark.glow,

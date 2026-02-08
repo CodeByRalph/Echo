@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import React, { useMemo, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { BlurredBottomSheet } from './BlurredBottomSheet';
 import { Colors } from '../constants/Colors';
 import { useStore } from '../store/useStore';
@@ -21,17 +21,42 @@ interface ReminderCardProps {
 }
 
 export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelete, onEdit, householdId, assigneeId }: ReminderCardProps) {
-    const currentHousehold = useStore(state => state.currentHousehold);
+    const households = useStore(state => state.households);
+    const activeHouseholdId = useStore(state => state.activeHouseholdId);
+    const currentHousehold = useMemo(() => households.find(h => h.id === activeHouseholdId), [households, activeHouseholdId]);
     const userId = useStore(state => state.userId);
     const nagMember = useStore(state => state.nagMember);
-    const [showActions, setShowActions] = useState(false);
-    const [showSnooze, setShowSnooze] = useState(false);
-    const [showReschedulePrompt, setShowReschedulePrompt] = useState(false);
-    const [showNudgeNotice, setShowNudgeNotice] = useState(false);
+    const snoozePresets = useStore(state => state.settings.snooze_presets_mins);
+    const [sheetMode, setSheetMode] = useState<'actions' | 'snooze' | 'nudge' | null>(null);
+    const checkScale = useRef(new Animated.Value(1)).current;
+    const enterOpacity = useRef(new Animated.Value(0)).current;
+    const enterTranslate = useRef(new Animated.Value(8)).current;
+    const exitTranslate = useRef(new Animated.Value(0)).current;
+    const exitOpacity = useRef(new Animated.Value(1)).current;
+    const hasEntered = useRef(false);
+    const [isRemoving, setIsRemoving] = useState(false);
+
+    useEffect(() => {
+        if (hasEntered.current) return;
+        hasEntered.current = true;
+        Animated.parallel([
+            Animated.timing(enterOpacity, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            Animated.timing(enterTranslate, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        ]).start();
+    }, [enterOpacity, enterTranslate]);
+
+    useEffect(() => {
+        if (isCompleted) {
+            Animated.sequence([
+                Animated.timing(checkScale, { toValue: 1.08, duration: 140, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+                Animated.timing(checkScale, { toValue: 1, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            ]).start();
+        }
+    }, [checkScale, isCompleted]);
 
     // Resolve Assignee
     const assignee = householdId && assigneeId && currentHousehold?.members
-        ? currentHousehold.members.find(m => m.user_id === assigneeId)
+        ? currentHousehold.members.find((m) => m.user_id === assigneeId)
         : null;
 
     // Fallback name logic: Profile name -> Profile email -> 'Unknown'
@@ -43,47 +68,50 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
 
     const showActionMenu = () => {
         Haptics.selectionAsync();
-        setShowActions(true);
+        setSheetMode('actions');
     };
 
-    const handleSnooze = () => {
-        // Use Store directly to avoid prop drilling for this specific logic if complex
-        // For MVP, we need to know the current snooze count.
-        // Since we don't pass the full reminder object here, we might need to fetch it or pass it down.
-        // Let's assume we can get it from the store or props.
-        // Ideally props should have it. Let's update props first.
-        const state = require('../store/useStore').useStore.getState();
-        const reminder = state.reminders.find((r: any) => r.id === id);
-
-        if (!reminder) return;
-
-        const snoozeCount = reminder.snooze_count || 0;
-        if (snoozeCount >= 2) {
-            setShowReschedulePrompt(true);
-        } else {
-            showStandardSnoozeOptions();
-        }
+    const formatSnoozeLabel = (minutes: number) => {
+        if (minutes < 60) return `${minutes} minutes`;
+        if (minutes === 60) return '1 hour';
+        const hours = Math.round(minutes / 60);
+        return `${hours} hours`;
     };
-
-    const showStandardSnoozeOptions = () => {
-        setShowSnooze(true);
-    }
-
 
     const handleComplete = () => {
         console.log('ReminderCard: handleComplete called', { id, title, isCompleted });
-        if (isCompleted) {
+        if (isCompleted || isRemoving) {
             console.log('ReminderCard: Already completed, returning');
             return; // Idempotency lock
         }
         console.log('ReminderCard: Calling onComplete');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setIsRemoving(true);
         onComplete();
+        Animated.parallel([
+            Animated.timing(exitTranslate, { toValue: 40, duration: 220, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+            Animated.timing(exitOpacity, { toValue: 0, duration: 200, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+        ]).start(() => {
+            setIsRemoving(false);
+            exitTranslate.setValue(0);
+            exitOpacity.setValue(1);
+        });
     };
 
     return (
         <>
-        <View style={styles.container}>
+        <Animated.View
+            style={[
+                styles.container,
+                {
+                    opacity: Animated.multiply(enterOpacity, exitOpacity),
+                    transform: [
+                        { translateY: enterTranslate },
+                        { translateX: exitTranslate }
+                    ]
+                }
+            ]}
+        >
             <View style={styles.row}>
                 {/* Main Tap Area: Complete Task */}
                 <Pressable
@@ -93,10 +121,12 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
                         pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 }
                     ]}
                 >
-                    <View style={[styles.checkboxBase, isCompleted && styles.checkboxChecked]}>
-                        {isCompleted && <Ionicons name="checkmark" size={16} color={Colors.dark.background} />}
-                        {!isCompleted && <View style={styles.checkboxInner} />}
-                    </View>
+                    <Animated.View style={{ transform: [{ scale: checkScale }] }}>
+                        <View style={[styles.checkboxBase, isCompleted && styles.checkboxChecked]}>
+                            {isCompleted && <Ionicons name="checkmark" size={16} color={Colors.dark.background} />}
+                            {!isCompleted && <View style={styles.checkboxInner} />}
+                        </View>
+                    </Animated.View>
 
                     <View style={styles.rowContent}>
                         <ThemedText weight="medium" style={[styles.title, isCompleted && styles.completedText]} numberOfLines={1}>
@@ -137,7 +167,7 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
                             onPress={() => {
                                 nagMember(id);
                                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                                setShowNudgeNotice(true);
+                                setSheetMode('nudge');
                             }}
                         >
                             <Ionicons name="notifications-outline" size={14} color={Colors.dark.primary} />
@@ -148,60 +178,40 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
                     )}
                 </View>
             )}
-        </View>
+        </Animated.View>
         <BlurredBottomSheet
-            visible={showActions}
-            onClose={() => setShowActions(false)}
-            title="Task options"
-            subtitle={title}
-            actions={[
-                { label: 'Snooze', tone: 'accent', onPress: () => { setShowActions(false); handleSnooze(); } },
-                { label: 'Edit details', onPress: () => { setShowActions(false); onEdit(); } },
-                { label: 'Delete reminder', tone: 'destructive', onPress: () => { setShowActions(false); onDelete(); } }
-            ]}
-        />
-        <BlurredBottomSheet
-            visible={showSnooze}
-            onClose={() => setShowSnooze(false)}
-            title="Snooze until"
-            actions={[
-                { label: '10 minutes', onPress: () => { setShowSnooze(false); useStore.getState().snoozeReminder(id, 10); } },
-                { label: '1 hour', onPress: () => { setShowSnooze(false); useStore.getState().snoozeReminder(id, 60); } },
-                { label: 'Tomorrow', onPress: () => { setShowSnooze(false); useStore.getState().snoozeReminder(id, 1440); } }
-            ]}
-        />
-        <BlurredBottomSheet
-            visible={showReschedulePrompt}
-            onClose={() => setShowReschedulePrompt(false)}
-            title="You're snoozing often"
-            subtitle="Want to reschedule instead?"
-            actions={[
-                {
-                    label: 'Reschedule +2 hours',
-                    tone: 'accent',
-                    onPress: () => {
-                        const suggestedTime = new Date();
-                        suggestedTime.setHours(suggestedTime.getHours() + 2);
-                        useStore.getState().updateReminder(id, {
-                            due_at: suggestedTime.toISOString(),
-                            next_fire_at: suggestedTime.toISOString(),
-                            snooze_count: 0
-                        });
-                        setShowReschedulePrompt(false);
-                    }
-                },
-                {
-                    label: 'Just snooze',
-                    onPress: () => { setShowReschedulePrompt(false); setShowSnooze(true); }
-                }
-            ]}
-        />
-        <BlurredBottomSheet
-            visible={showNudgeNotice}
-            onClose={() => setShowNudgeNotice(false)}
-            title="Nudge sent"
-            subtitle={`${assigneeName} has been notified.`}
-            actions={[{ label: 'Done', onPress: () => setShowNudgeNotice(false) }]}
+            visible={sheetMode !== null}
+            onClose={() => setSheetMode(null)}
+            title={
+                sheetMode === 'actions' ? 'Task options' :
+                sheetMode === 'snooze' ? 'Snooze until' :
+                sheetMode === 'nudge' ? 'Nudge sent' :
+                undefined
+            }
+            subtitle={
+                sheetMode === 'actions' ? title :
+                sheetMode === 'nudge' ? `${assigneeName} has been notified.` :
+                undefined
+            }
+            actions={
+                sheetMode === 'actions'
+                    ? [
+                        { label: 'Snooze', tone: 'accent', onPress: () => setSheetMode('snooze') },
+                        { label: 'Edit details', onPress: () => { setSheetMode(null); onEdit(); } },
+                        { label: 'Delete reminder', tone: 'destructive', onPress: () => { setSheetMode(null); onDelete(); } }
+                    ]
+                    : sheetMode === 'snooze'
+                    ? [
+                        ...snoozePresets.map((minutes) => ({
+                            label: formatSnoozeLabel(minutes),
+                            onPress: () => { setSheetMode(null); useStore.getState().snoozeReminder(id, minutes); }
+                        })),
+                        { label: 'Tomorrow', onPress: () => { setSheetMode(null); useStore.getState().snoozeReminder(id, 1440); } }
+                    ]
+                    : sheetMode === 'nudge'
+                    ? [{ label: 'Done', onPress: () => setSheetMode(null) }]
+                    : []
+            }
         />
         </>
     );

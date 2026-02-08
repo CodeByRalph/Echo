@@ -348,6 +348,8 @@ export const useStore = create<AppState>()(
                 const nextFire = addMinutes(now, minutes).toISOString();
                 const updates = {
                     next_fire_at: nextFire,
+                    due_at: nextFire,
+                    status: 'active' as const,
                     last_action: 'snooze' as const,
                     updated_at: now.toISOString(),
                     snooze_count: (state.reminders.find(r => r.id === id)?.snooze_count || 0) + 1,

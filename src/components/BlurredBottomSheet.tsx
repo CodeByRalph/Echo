@@ -52,52 +52,54 @@ export function BlurredBottomSheet({
 
     return (
         <Modal transparent visible={mounted} onRequestClose={onClose} statusBarTranslucent>
-            <Pressable style={styles.overlay} onPress={onClose}>
-                <Animated.View style={[styles.overlayTint, { opacity }]} />
-            </Pressable>
-            <Animated.View style={[styles.sheetWrap, { transform: [{ translateY }], opacity }]}>
-                <BlurView intensity={30} tint="dark" style={styles.sheet}>
-                    <View style={styles.sheetInner}>
-                        {hasHeader && (
-                            <View style={styles.header}>
-                                {title && <ThemedText variant="h3" weight="semibold">{title}</ThemedText>}
-                                {subtitle && (
-                                    <ThemedText variant="caption" color={Colors.dark.textSecondary} style={{ marginTop: 6 }}>
-                                        {subtitle}
-                                    </ThemedText>
-                                )}
-                            </View>
-                        )}
-                        {children}
-                        {actions.length > 0 && (
-                            <View style={styles.actions}>
-                                {actions.map((action) => (
-                                    <Pressable
-                                        key={action.label}
-                                        onPress={action.onPress}
-                                        style={({ pressed }) => [
-                                            styles.actionButton,
-                                            pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 }
-                                        ]}
-                                    >
-                                        <ThemedText
-                                            weight="semibold"
-                                            style={{
-                                                color:
-                                                    action.tone === 'accent' ? Colors.dark.primary :
-                                                    action.tone === 'destructive' ? Colors.dark.error :
-                                                    Colors.dark.text
-                                            }}
-                                        >
-                                            {action.label}
+            <View style={StyleSheet.absoluteFillObject} pointerEvents={visible ? 'auto' : 'none'}>
+                <Pressable style={styles.overlay} onPress={onClose}>
+                    <Animated.View style={[styles.overlayTint, { opacity }]} />
+                </Pressable>
+                <Animated.View style={[styles.sheetWrap, { transform: [{ translateY }], opacity }]}>
+                    <BlurView intensity={30} tint="dark" style={styles.sheet}>
+                        <View style={styles.sheetInner}>
+                            {hasHeader && (
+                                <View style={styles.header}>
+                                    {title && <ThemedText variant="h3" weight="semibold">{title}</ThemedText>}
+                                    {subtitle && (
+                                        <ThemedText variant="caption" color={Colors.dark.textSecondary} style={{ marginTop: 6 }}>
+                                            {subtitle}
                                         </ThemedText>
-                                    </Pressable>
-                                ))}
-                            </View>
-                        )}
-                    </View>
-                </BlurView>
-            </Animated.View>
+                                    )}
+                                </View>
+                            )}
+                            {children}
+                            {actions.length > 0 && (
+                                <View style={styles.actions}>
+                                    {actions.map((action) => (
+                                        <Pressable
+                                            key={action.label}
+                                            onPress={action.onPress}
+                                            style={({ pressed }) => [
+                                                styles.actionButton,
+                                                pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 }
+                                            ]}
+                                        >
+                                            <ThemedText
+                                                weight="semibold"
+                                                style={{
+                                                    color:
+                                                        action.tone === 'accent' ? Colors.dark.primary :
+                                                        action.tone === 'destructive' ? Colors.dark.error :
+                                                        Colors.dark.text
+                                                }}
+                                            >
+                                                {action.label}
+                                            </ThemedText>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    </BlurView>
+                </Animated.View>
+            </View>
         </Modal>
     );
 }

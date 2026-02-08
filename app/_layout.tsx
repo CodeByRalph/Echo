@@ -26,7 +26,16 @@ export default function RootLayout() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) {
+      if (session?.user) {
+        // Reset state first to clear any old user data, then hydrate
+        // Wait for next tick to ensure state is cleared? No, set is asyncish but zustand is synchronous for non-async actions.
+        // However, to be safe, we can just call hydrate which now sets the user ID.
+        // Actually, if we switch users, we should probably reset first.
+        const currentUserId = useStore.getState().userId;
+        if (currentUserId && currentUserId !== session.user.id) {
+          useStore.getState().resetState();
+        }
+
         useStore.getState().hydrate().catch(e => console.error('Hydration failed:', e));
       } else {
         // Reset store locally without triggering another auth sign out
@@ -66,6 +75,8 @@ export default function RootLayout() {
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'New Reminder' }} />
         <Stack.Screen name="snooze-settings" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="account" options={{ headerShown: false }} />
+        <Stack.Screen name="stream/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="stream/create" options={{ presentation: 'modal', headerShown: false }} />
       </Stack>
     </GestureHandlerRootView>
   );

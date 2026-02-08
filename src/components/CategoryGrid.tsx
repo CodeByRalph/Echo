@@ -12,11 +12,16 @@ export function CategoryGrid() {
     const reminders = useStore((state) => state.reminders);
     const isPro = useStore((state) => state.isPro);
     const togglePro = useStore((state) => state.togglePro); // Temp for demo
+    const currentHousehold = useStore((state) => state.currentHousehold);
     const router = useRouter();
 
     // Calculate counts
-    const getCount = (catId: string) =>
-        reminders.filter(r => r.category_id === catId && r.status === 'active' && !r.deleted_at).length;
+    const getCount = (catId: string) => {
+        if (catId === 'family-household') {
+            return reminders.filter(r => currentHousehold && r.household_id === currentHousehold.id && r.status === 'active' && !r.deleted_at).length;
+        }
+        return reminders.filter(r => r.category_id === catId && r.status === 'active' && !r.deleted_at).length;
+    };
 
     const handleNewCategory = () => {
         if (!isPro) {
@@ -48,6 +53,32 @@ export function CategoryGrid() {
 
     return (
         <View style={styles.container}>
+            {/* Family Section (Separate) */}
+            {currentHousehold && (
+                <View style={{ marginBottom: 20, paddingHorizontal: 20 }}>
+                    <ThemedText variant="h3" weight="bold" style={{ marginBottom: 12 }}>Family Space</ThemedText>
+                    <TouchableOpacity
+                        style={[styles.card, styles.familyCard]}
+                        onPress={() => router.push('/category/family-household')}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={[styles.iconContainer, { backgroundColor: Colors.dark.accent, width: 40, height: 40, borderRadius: 20 }]}>
+                                <Ionicons name="people" size={24} color="white" />
+                            </View>
+                            <View style={{ marginLeft: 12 }}>
+                                <ThemedText weight="bold" style={styles.name}>{currentHousehold.name}</ThemedText>
+                                <ThemedText variant="caption" color={Colors.dark.textSecondary}>
+                                    {getCount('family-household')} active tasks
+                                </ThemedText>
+                            </View>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color={Colors.dark.textSecondary} />
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Other Categories */}
+            <ThemedText variant="h3" weight="bold" style={{ marginBottom: 12, paddingHorizontal: 20 }}>Lists</ThemedText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 {categories.map(cat => (
                     <CategoryCard key={cat.id} category={cat} />
@@ -63,7 +94,7 @@ export function CategoryGrid() {
             </ScrollView>
 
             {!isPro && (
-                <TouchableOpacity onPress={togglePro} style={{ paddingHorizontal: 20, marginTop: 8 }}>
+                <TouchableOpacity onPress={togglePro} style={{ paddingHorizontal: 20, marginTop: 16 }}>
                     <ThemedText variant="caption" color={Colors.dark.textMuted} style={{ fontSize: 10 }}>(Dev: Toggle Pro)</ThemedText>
                 </TouchableOpacity>
             )}
@@ -86,6 +117,13 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 12,
         justifyContent: 'space-between',
+    },
+    familyCard: {
+        width: '100%',
+        height: 'auto',
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
     },
     newCard: {
         borderWidth: 1,

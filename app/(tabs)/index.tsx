@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import React, { useMemo } from 'react';
 import { Pressable, SectionList, StyleSheet, View } from 'react-native';
 import { CategoryGrid } from '../../src/components/CategoryGrid';
-import { DashboardStats } from '../../src/components/DashboardStats';
 import { EmptyState } from '../../src/components/EmptyState';
 import { GreetingHeader } from '../../src/components/GreetingHeader';
 import { Layout } from '../../src/components/Layout';
@@ -29,7 +28,9 @@ export default function TodayScreen() {
 
     activeReminders.forEach(r => {
       const fireDate = parseISO(r.next_fire_at);
-      const now = new Date();
+
+      // Filter out family reminders from "Today/Upcoming" as they are in the family folder
+      if (r.household_id) return;
 
       // Only show tasks that are due (past or today)
       if (isPast(fireDate) && !isToday(fireDate)) {
@@ -42,9 +43,11 @@ export default function TodayScreen() {
       }
     });
 
-    overdue.sort((a, b) => compareAsc(parseISO(a.next_fire_at), parseISO(b.next_fire_at)));
-    today.sort((a, b) => compareAsc(parseISO(a.next_fire_at), parseISO(b.next_fire_at)));
-    upcoming.sort((a, b) => compareAsc(parseISO(a.next_fire_at), parseISO(b.next_fire_at)));
+    const sortByDate = (a: Reminder, b: Reminder) => compareAsc(parseISO(a.next_fire_at), parseISO(b.next_fire_at));
+
+    overdue.sort(sortByDate);
+    today.sort(sortByDate);
+    upcoming.sort(sortByDate);
 
     const result = [];
     if (overdue.length > 0) result.push({ title: 'Overdue', data: overdue, color: Colors.dark.error });
@@ -63,7 +66,6 @@ export default function TodayScreen() {
         ListHeaderComponent={
           <View>
             <GreetingHeader />
-            <DashboardStats />
             <ProductivityHeatmap />
             <CategoryGrid />
           </View>
@@ -106,6 +108,8 @@ export default function TodayScreen() {
                     onComplete={() => useStore.getState().completeReminder(item.id)}
                     onDelete={() => useStore.getState().deleteReminder(item.id)}
                     onEdit={() => router.push({ pathname: '/modal', params: { id: item.id } })}
+                    householdId={item.household_id}
+                    assigneeId={item.assignee_id}
                   />
                 );
               })()}

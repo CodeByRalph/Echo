@@ -9,6 +9,7 @@ import { Layout } from '../src/components/Layout';
 import { ThemedText } from '../src/components/ThemedText';
 import { Colors } from '../src/constants/Colors';
 import { useStore } from '../src/store/useStore';
+import { Reminder } from '../src/types';
 
 export default function ModalScreen() {
     const params = useLocalSearchParams();
@@ -40,26 +41,26 @@ export default function ModalScreen() {
     const handleSave = () => {
         if (!title.trim()) return;
 
+        const payload: Partial<Reminder> & { status?: string, version?: number } = {
+            title,
+            notes,
+            due_at: date.toISOString(),
+            next_fire_at: date.toISOString(),
+            recurrence: { type: 'none', interval: 1 },
+            // If family selected, set household_id, else set category_id
+            household_id: selectedCategoryId === 'family-household' ? useStore.getState().currentHousehold?.id : undefined,
+            category_id: selectedCategoryId === 'family-household' ? undefined : selectedCategoryId,
+        };
+
         if (id) {
-            updateReminder(id, {
-                title,
-                notes,
-                due_at: date.toISOString(),
-                next_fire_at: date.toISOString(),
-                recurrence: { type: 'none', interval: 1 },
-                category_id: selectedCategoryId,
-            });
+            updateReminder(id, payload);
         } else {
             addReminder({
-                title,
-                notes,
+                ...payload,
                 status: 'active',
-                due_at: date.toISOString(),
-                next_fire_at: date.toISOString(),
-                recurrence: { type: 'none', interval: 1 },
-                category_id: selectedCategoryId,
+                recurrence: { type: 'none', interval: 1 }, // Type fix
                 version: 1,
-            });
+            } as any);
         }
 
         router.back();
@@ -110,6 +111,25 @@ export default function ModalScreen() {
                 <View>
                     <ThemedText variant="label" style={{ marginBottom: 8 }}>List</ThemedText>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                        {/* Family Space Option */}
+                        {useStore((state) => state.currentHousehold) && (
+                            <TouchableOpacity
+                                key="family-household"
+                                onPress={() => setSelectedCategoryId('family-household')}
+                                style={[
+                                    styles.chip,
+                                    selectedCategoryId === 'family-household' && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent },
+                                ]}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Ionicons name="people" size={16} color={selectedCategoryId === 'family-household' ? 'white' : Colors.dark.accent} style={{ marginRight: 6 }} />
+                                    <ThemedText style={{ color: selectedCategoryId === 'family-household' ? 'white' : Colors.dark.textSecondary }}>
+                                        {useStore((state) => state.currentHousehold)!.name}
+                                    </ThemedText>
+                                </View>
+                            </TouchableOpacity>
+                        )}
+
                         {categories.map(cat => (
                             <TouchableOpacity
                                 key={cat.id}

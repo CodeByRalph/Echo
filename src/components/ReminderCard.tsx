@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { ActionSheetIOS, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Colors } from '../constants/Colors';
+import { Avatar } from './Avatar';
 import { ThemedText } from './ThemedText';
 
 interface ReminderCardProps {
@@ -13,9 +14,11 @@ interface ReminderCardProps {
     onComplete: () => void;
     onDelete: () => void;
     onEdit: () => void;
+    householdId?: string;
+    assigneeId?: string;
 }
 
-export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelete, onEdit }: ReminderCardProps) {
+export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelete, onEdit, householdId, assigneeId }: ReminderCardProps) {
 
     const showActionMenu = () => {
         Haptics.selectionAsync();
@@ -39,12 +42,73 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
                 title,
                 [
                     { text: 'Cancel', style: 'cancel' },
+                    { text: 'Snooze', onPress: handleSnooze }, // Added Snooze
                     { text: 'Edit', onPress: onEdit },
                     { text: 'Delete', onPress: onDelete, style: 'destructive' },
                 ]
             );
         }
     };
+
+    const handleSnooze = () => {
+        // Use Store directly to avoid prop drilling for this specific logic if complex
+        // For MVP, we need to know the current snooze count.
+        // Since we don't pass the full reminder object here, we might need to fetch it or pass it down.
+        // Let's assume we can get it from the store or props.
+        // Ideally props should have it. Let's update props first.
+        const state = require('../store/useStore').useStore.getState();
+        const reminder = state.reminders.find((r: any) => r.id === id);
+
+        if (!reminder) return;
+
+        const snoozeCount = reminder.snooze_count || 0;
+
+        if (snoozeCount >= 2) {
+            // Adaptive Nudge
+            const suggestedTime = new Date();
+            suggestedTime.setHours(suggestedTime.getHours() + 2); // Mock logic: +2 hours
+            const timeString = suggestedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            Alert.alert(
+                "You've snoozed this a few times.",
+                `You usually complete tasks like this around ${timeString}. Want to reschedule?`,
+                [
+                    {
+                        text: 'Yes, Reschedule',
+                        onPress: () => {
+                            state.updateReminder(id, {
+                                due_at: suggestedTime.toISOString(),
+                                next_fire_at: suggestedTime.toISOString(),
+                                snooze_count: 0 // Reset on meaningful reschedule
+                            });
+                        }
+                    },
+                    {
+                        text: 'No, just snooze',
+                        style: 'cancel',
+                        onPress: showStandardSnoozeOptions
+                    }
+                ]
+            );
+        } else {
+            showStandardSnoozeOptions();
+        }
+    };
+
+    const showStandardSnoozeOptions = () => {
+        const state = require('../store/useStore').useStore.getState();
+        Alert.alert(
+            'Snooze until...',
+            undefined,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: '10 Minutes', onPress: () => state.snoozeReminder(id, 10) },
+                { text: '1 Hour', onPress: () => state.snoozeReminder(id, 60) },
+                { text: 'Tomorrow', onPress: () => state.snoozeReminder(id, 1440) }, // Simple +24h
+            ]
+        );
+    }
+
 
     const handleComplete = () => {
         console.log('ReminderCard: handleComplete called', { id, title, isCompleted });
@@ -92,9 +156,39 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
                     <Ionicons name="ellipsis-horizontal" size={20} color={Colors.dark.textSecondary} />
                 </Pressable>
             </View>
+
+            {/* Family Loop Footer */}
+            {householdId && assigneeId && (
+                <View style={styles.footer}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Avatar name="Mom" size={24} />
+                        {/* Mock name, ideally pass user object or fetch */}
+                        <ThemedText variant="caption" color={Colors.dark.textSecondary} style={{ marginLeft: 8 }}>
+                            Assigned to Mom
+                        </ThemedText>
+                    </View>
+
+                    {!isCompleted && (
+                        <Pressable
+                            style={({ pressed }) => [styles.nagButton, pressed && { opacity: 0.7 }]}
+                            onPress={() => {
+                                Alert.alert("Nag Sent!", "Mom has been nudged.");
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                            }}
+                        >
+                            <Ionicons name="notifications-outline" size={14} color={Colors.dark.primary} />
+                            <ThemedText variant="caption" color={Colors.dark.primary} weight="bold" style={{ marginLeft: 4 }}>
+                                Nudge
+                            </ThemedText>
+                        </Pressable>
+                    )}
+                </View>
+            )}
         </View>
     );
 }
+
+
 
 const styles = StyleSheet.create({
     container: {
@@ -152,5 +246,21 @@ const styles = StyleSheet.create({
     menuButton: {
         padding: 4,
         paddingLeft: 12,
+    },
+    footer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        paddingTop: 4,
+    },
+    nagButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        backgroundColor: Colors.dark.surfaceHighlight,
+        borderRadius: 12,
     }
 });

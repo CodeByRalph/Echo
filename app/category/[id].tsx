@@ -15,14 +15,34 @@ export default function CategoryDetailScreen() {
     const router = useRouter();
     const categories = useStore(state => state.categories);
     const reminders = useStore(state => state.reminders);
+    const currentHousehold = useStore(state => state.currentHousehold);
     const completeReminder = useStore(state => state.completeReminder);
 
-    const category = categories.find(c => c.id === id);
-    const categoryReminders = reminders.filter(r =>
-        r.category_id === id &&
-        r.status === 'active' &&
-        !r.deleted_at
-    );
+    let category = categories.find(c => c.id === id);
+    let categoryReminders = [];
+
+    if (id === 'family-household' && currentHousehold) {
+        // Virtual Category for Family
+        category = {
+            id: 'family-household',
+            name: currentHousehold.name,
+            color: Colors.dark.accent,
+            icon: 'people',
+            isDefault: false
+        };
+        categoryReminders = reminders.filter(r =>
+            r.household_id === currentHousehold.id &&
+            r.status === 'active' &&
+            !r.deleted_at
+        );
+    } else {
+        // Standard Category
+        categoryReminders = reminders.filter(r =>
+            r.category_id === id &&
+            r.status === 'active' &&
+            !r.deleted_at
+        );
+    }
 
     if (!category) {
         return (
@@ -71,11 +91,12 @@ export default function CategoryDetailScreen() {
                             id={item.id}
                             title={item.title}
                             time={formatDueTime(item.next_fire_at)}
-                            isRecurring={item.recurrence.type !== 'none'}
                             isCompleted={isCompletedForCurrentOccurrence}
                             onComplete={() => useStore.getState().completeReminder(item.id)}
                             onDelete={() => useStore.getState().deleteReminder(item.id)}
                             onEdit={() => router.push({ pathname: '/modal', params: { id: item.id } })}
+                            householdId={item.household_id}
+                            assigneeId={item.assignee_id}
                         />
                     );
                 }}

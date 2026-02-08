@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addMinutes } from 'date-fns';
+import { Alert } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { Colors } from '../constants/Colors';
 import { supabase } from '../lib/supabase';
-import { Category, Reminder, UserSettings } from '../types';
+import { Category, Household, Reminder, Stream, UserSettings } from '../types';
 import { computeNextFireAt } from '../utils/recurrence';
 
 interface AppState {
@@ -31,6 +32,21 @@ interface AppState {
     snoozeReminder: (id: string, minutes: number) => void;
 
     updateSettings: (updates: Partial<UserSettings>) => void;
+
+    // Community Streams
+    publicStreams: Stream[];
+    fetchPublicStreams: () => Promise<void>;
+    createStream: (title: string, description: string, items: { title: string, recurrence_rule: any, day_offset: number, time_of_day?: string }[]) => Promise<void>;
+    subscribeToStream: (streamId: string) => Promise<void>;
+
+    // Family Loop
+    currentHousehold: Household | null;
+    createHousehold: (name: string) => Promise<void>;
+    joinHousehold: (inviteCode: string) => Promise<void>; // Mock
+    fetchHouseholdMembers: () => Promise<void>;
+    assignReminder: (reminderId: string, userId: string) => void;
+    nagMember: (reminderId: string) => void;
+    leaveHousehold: () => Promise<void>;
 }
 
 // Simple UUID v4 generator for Supabase compatibility
@@ -65,7 +81,7 @@ export const useStore = create<AppState>()(
                     if (userError) throw userError;
 
                     if (!user) {
-                        set({ userId: null, reminders: [], activity: {} });
+                        set({ userId: null, reminders: [], activity: {}, currentHousehold: null });
                         return;
                     }
 
@@ -78,6 +94,19 @@ export const useStore = create<AppState>()(
 
                     const { data: activity, error: activityError } = await supabase.from('activity').select('*');
                     if (activityError) console.error('Activity fetch error:', activityError);
+
+                    // Fetch Household
+                    let currentHousehold = null;
+                    const { data: membership } = await supabase.from('household_members').select('household_id').eq('user_id', user.id).single();
+                    if (membership) {
+                        const { data: household } = await supabase.from('households').select('*').eq('id', membership.household_id).single();
+                        if (household) {
+                            currentHousehold = household;
+                            // Fetch members
+                            const { data: members } = await supabase.from('household_members').select('*').eq('household_id', household.id);
+                            currentHousehold.members = members || [];
+                        }
+                    }
 
                     set((state) => ({
                         userId: user.id,
@@ -92,7 +121,9 @@ export const useStore = create<AppState>()(
                         activity: (activity || []).reduce((acc: any, curr: any) => {
                             acc[curr.date_key] = curr.count;
                             return acc;
-                        }, {})
+                        }, {}),
+
+                        currentHousehold
                     }));
                 } catch (e) {
                     console.error('Hydration Action Failed:', e);
@@ -100,7 +131,7 @@ export const useStore = create<AppState>()(
             },
 
             resetState: () => {
-                set({ userId: null, reminders: [], activity: {} });
+                set({ userId: null, reminders: [], activity: {}, currentHousehold: null });
             },
 
             signOut: async () => {
@@ -146,7 +177,8 @@ export const useStore = create<AppState>()(
                     updated_at: now,
                     version: 1,
                     last_action: 'create',
-                    category_id: reminderData.category_id
+                    category_id: reminderData.category_id,
+                    snooze_count: 0
                 };
 
                 // Async DB Insert
@@ -261,6 +293,7 @@ export const useStore = create<AppState>()(
                     next_fire_at: nextFire,
                     last_action: 'snooze' as const,
                     updated_at: now.toISOString(),
+                    snooze_count: (state.reminders.find(r => r.id === id)?.snooze_count || 0) + 1,
                 };
 
                 // DB Update
@@ -280,12 +313,272 @@ export const useStore = create<AppState>()(
             updateSettings: (updates) => set((state) => ({
                 settings: { ...state.settings, ...updates }
             })),
+
+            // Community Streams Actions
+            publicStreams: [],
+
+            fetchPublicStreams: async () => {
+                const { data, error } = await supabase
+                    .from('streams')
+                    .select('*, items:stream_items(*)')
+                    .eq('is_public', true)
+                    .order('likes_count', { ascending: false });
+
+                if (error || !data || data.length === 0) {
+                    console.log('No streams found in DB or error, using mock data');
+                    const { MOCK_STREAMS } = require('../data/mockStreams');
+                    set({ publicStreams: MOCK_STREAMS });
+                    return;
+                }
+
+                set({ publicStreams: data as any[] });
+            },
+
+            createStream: async (title, description, items) => {
+                const state = get();
+                if (!state.userId) return;
+
+                const streamId = generateId();
+                const now = new Date().toISOString();
+
+                // 1. Create Stream
+                const { error: streamError } = await supabase.from('streams').insert({
+                    id: streamId,
+                    creator_id: state.userId,
+                    title,
+                    description,
+                    is_public: true,
+                    created_at: now,
+                    updated_at: now
+                });
+
+                if (streamError) {
+                    console.error('Error creating stream:', streamError);
+                    return;
+                }
+
+                // 2. Create Items
+                if (items.length > 0) {
+                    const streamItems = items.map(item => ({
+                        id: generateId(),
+                        stream_id: streamId,
+                        title: item.title,
+                        recurrence_rule: item.recurrence_rule, // JSONB conversion handled by Supabase
+                        day_offset: item.day_offset,
+                        time_of_day: item.time_of_day
+                    }));
+
+                    const { error: itemsError } = await supabase.from('stream_items').insert(streamItems);
+                    if (itemsError) console.error('Error creating stream items:', itemsError);
+                }
+
+                // Refresh
+                await state.fetchPublicStreams();
+            },
+
+            subscribeToStream: async (streamId) => {
+                const state = get();
+                if (!state.userId) return;
+
+                // Fetch stream details if not in list
+                let stream = state.publicStreams.find(s => s.id === streamId);
+                if (!stream) {
+                    // fetch... for now assume it's in the list or handle later
+                    console.log('Stream not found in cache');
+                    return;
+                }
+
+                // Create subscription record
+                await supabase.from('stream_subscriptions').insert({
+                    user_id: state.userId,
+                    stream_id: streamId
+                });
+
+                // Import Reminders!
+                const now = new Date(); // Start "Day 0" today
+                const newReminders: Reminder[] = [];
+
+                (stream.items || []).forEach(item => {
+                    // Calculate start date based on day_offset
+                    const startDate = new Date(now);
+                    startDate.setDate(startDate.getDate() + item.day_offset);
+
+                    // Set time if present
+                    if (item.time_of_day) {
+                        const [hours, mins] = item.time_of_day.split(':').map(Number);
+                        startDate.setHours(hours, mins, 0, 0);
+                    }
+
+                    const newId = generateId();
+                    const reminder: Reminder = {
+                        id: newId,
+                        user_id: state.userId!,
+                        title: item.title,
+                        status: 'active',
+                        due_at: startDate.toISOString(),
+                        next_fire_at: startDate.toISOString(),
+                        recurrence: item.recurrence_rule, // Copy rule
+                        created_at: now.toISOString(),
+                        updated_at: now.toISOString(),
+                        version: 1,
+                        last_action: 'create',
+                        snooze_count: 0
+                    };
+
+                    newReminders.push(reminder);
+                });
+
+                // Bulk insert reminders
+                // Note: Supabase insert can take an array
+                const { error } = await supabase.from('reminders').insert(newReminders);
+                if (error) console.error('Error importing stream reminders:', error);
+
+                set(s => ({
+                    reminders: [...s.reminders, ...newReminders]
+                }));
+            },
+
+            // Family Loop Actions
+            currentHousehold: null,
+
+            createHousehold: async (name) => {
+                const state = get();
+                if (!state.userId) return;
+
+                const now = new Date().toISOString();
+
+                // Call secure RPC
+                const { data, error } = await supabase.rpc('create_household', { name_input: name });
+
+                if (error) {
+                    console.error('RPC Error creating household:', error);
+                    Alert.alert("Error", "Network error creating household.");
+                    return;
+                }
+
+                if (!data.success) {
+                    Alert.alert("Failed", data.message || "Could not create household.");
+                    return;
+                }
+
+                set({
+                    currentHousehold: {
+                        id: data.household_id,
+                        name,
+                        created_by: state.userId!,
+                        created_at: now,
+                        members: [{
+                            household_id: data.household_id,
+                            user_id: state.userId!,
+                            role: 'admin',
+                            joined_at: now,
+                            profile: { email: 'me@example.com' } // Mock until refresh
+                        }],
+                        invite_code: data.invite_code
+                    }
+                });
+            },
+
+            joinHousehold: async (inviteCode) => {
+                const state = get();
+                if (!state.userId) return;
+
+                // Call secure RPC
+                const { data, error } = await supabase.rpc('join_household', { invite_code_input: inviteCode });
+
+                if (error) {
+                    console.error('RPC Error:', error);
+                    Alert.alert("Error", "Network error joining household.");
+                    throw error; // Throw so UI knows it failed
+                }
+
+                if (!data.success) {
+                    Alert.alert("Failed", data.message || "Could not join household.");
+                    throw new Error(data.message);
+                }
+
+                // Success
+                // Fetch household details to update local state immediately
+                const { data: household } = await supabase.from('households').select('*').eq('id', data.household_id).single();
+
+                if (household) {
+                    set({
+                        currentHousehold: {
+                            ...household,
+                            members: []
+                        }
+                    });
+                    await state.fetchHouseholdMembers();
+                }
+            },
+
+            leaveHousehold: async () => {
+                const state = get();
+                if (!state.userId || !state.currentHousehold) return;
+
+                // Delete membership
+                const { error } = await supabase.from('household_members')
+                    .delete()
+                    .eq('household_id', state.currentHousehold.id)
+                    .eq('user_id', state.userId);
+
+                if (error) {
+                    console.error('Error leaving household:', error);
+                    Alert.alert("Error", "Failed to leave household.");
+                    return;
+                }
+
+                // Clear local state
+                set({ currentHousehold: null });
+            },
+
+            fetchHouseholdMembers: async () => {
+                // Fetch members for current household
+                const state = get();
+                if (!state.currentHousehold) return;
+
+                const { data, error } = await supabase
+                    .from('household_members')
+                    .select('*, profiles:user_id(email, full_name, avatar_url)') // Now relying on public.profiles
+                    .eq('household_id', state.currentHousehold.id);
+
+                if (error) {
+                    console.error('Error fetching members', error);
+                    return;
+                }
+
+                // Update state
+                set(s => ({
+                    currentHousehold: s.currentHousehold ? {
+                        ...s.currentHousehold,
+                        members: data as any[]
+                    } : null
+                }));
+            },
+
+            assignReminder: (reminderId, userId) => {
+                set(state => {
+                    // Optimistic update
+                    const updated = state.reminders.map(r => r.id === reminderId ? { ...r, assignee_id: userId, household_id: state.currentHousehold?.id } : r);
+
+                    // DB Update
+                    supabase.from('reminders').update({ assignee_id: userId, household_id: state.currentHousehold?.id }).eq('id', reminderId).then(({ error }) => {
+                        if (error) console.error("Error assigning reminder:", error);
+                    });
+
+                    return { reminders: updated };
+                });
+            },
+
+            nagMember: (reminderId) => {
+                console.log('Nagging member for reminder:', reminderId);
+                // In real app: Call Edge Function to send push notification
+                // For MVP: Local Alert (handled in UI) or just log
+            }
         }),
         {
             name: 'echo-storage',
             storage: createJSONStorage(() => AsyncStorage),
-            // Note: we removed onRehydrateStorage calling hydrate() here, 
-            // because we call it explicitly on auth state change to avoid double fetching or fetching before auth.
         }
     )
 );

@@ -10,7 +10,12 @@ export default function TabLayout() {
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    display: 'none',
+                    borderTopWidth: 0,
+                    elevation: 0,
+                    backgroundColor: Colors.dark.surface,
+                    height: 60,
+                    paddingBottom: 8,
+                    paddingTop: 8,
                 },
                 tabBarActiveTintColor: Colors.dark.primary,
                 tabBarInactiveTintColor: Colors.dark.textSecondary,
@@ -24,6 +29,13 @@ export default function TabLayout() {
                 options={{
                     title: 'Today',
                     tabBarIcon: ({ color, size }) => <Ionicons name="sunny" size={size} color={color} />,
+                }}
+            />
+            <Tabs.Screen
+                name="explore"
+                options={{
+                    title: 'Explore',
+                    tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={size} color={color} />,
                 }}
             />
             <Tabs.Screen

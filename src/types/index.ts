@@ -54,6 +54,13 @@ export interface Reminder {
     deleted_at?: string;   // ISO (Soft delete for sync)
     version: number;       // Increment on every edit
     last_action?: 'create' | 'edit' | 'snooze' | 'done' | 'undone';
+    snooze_count: number;  // Track snoozes for Adaptive logic
+
+    // Family Loop
+    household_id?: string;
+    assignee_id?: string;
+    completed_by?: string;
+    proof_url?: string;
 }
 
 export const ReminderSchema = z.object({
@@ -67,10 +74,54 @@ export const ReminderSchema = z.object({
     snooze_preset_mins: z.array(z.number()).optional(),
     created_at: z.string().datetime().optional(), // Server gen
     updated_at: z.string().datetime().optional(),
+    snooze_count: z.number().default(0),
+    household_id: z.string().uuid().optional(),
+    assignee_id: z.string().uuid().optional(),
+    completed_by: z.string().uuid().optional(),
+    proof_url: z.string().url().optional(),
 });
+
+export interface Household {
+    id: string;
+    name: string;
+    created_by: string;
+    created_at: string;
+    invite_code?: string; // Added via migration
+    members?: HouseholdMember[]; // Hydrated
+}
+
+export interface HouseholdMember {
+    household_id: string;
+    user_id: string;
+    role: 'admin' | 'member' | 'child';
+    joined_at: string;
+    profile?: { email: string }; // Hydrated
+}
 
 export interface UserSettings {
     snooze_presets_mins: number[];
     timezone: string;
     notifications_enabled: boolean;
+}
+
+export interface StreamItem {
+    id: string;
+    stream_id: string;
+    title: string;
+    recurrence_rule: RecurrenceConfig;
+    day_offset: number;
+    time_of_day?: string;
+}
+
+export interface Stream {
+    id: string;
+    creator_id: string;
+    title: string;
+    description?: string;
+    category?: string;
+    tags?: string[];
+    is_public: boolean;
+    likes_count: number;
+    created_at: string;
+    items?: StreamItem[]; // Hydrated
 }

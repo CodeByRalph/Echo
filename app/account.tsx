@@ -97,6 +97,12 @@ export default function SettingsScreen() {
                         />
                         <View style={styles.separator} />
                         <SettingItem
+                            icon="people-outline"
+                            title="Family Space"
+                            onPress={() => router.push('/family/setup')}
+                        />
+                        <View style={styles.separator} />
+                        <SettingItem
                             icon="notifications-outline"
                             title="Notifications"
                             type="switch"

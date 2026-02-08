@@ -25,6 +25,7 @@ interface AppState {
     resetState: () => void;
     checkProStatus: () => Promise<void>;
     purchasePro: () => Promise<void>;
+    setProStatus: (isPro: boolean) => void;
     togglePro: () => void; // Keeping for dev
 
     addReminder: (reminder: Omit<Reminder, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => void;
@@ -168,8 +169,13 @@ export const useStore = create<AppState>()(
             },
 
             checkProStatus: async () => {
-                await PurchaseService.init();
+                // Don't re-initialize RevenueCat - it should already be initialized
+                // Re-initializing causes warnings and can reset state
                 const isPro = await PurchaseService.checkProStatus();
+                set({ isPro });
+            },
+
+            setProStatus: (isPro: boolean) => {
                 set({ isPro });
             },
 

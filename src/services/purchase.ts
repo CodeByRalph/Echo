@@ -38,37 +38,73 @@ export const PurchaseService = {
 
         try {
             const { customerInfo } = await Purchases.purchasePackage(pack);
+            
+            // Log all entitlement information for debugging
             console.log('Purchase completed, checking entitlements:', {
                 activeEntitlements: Object.keys(customerInfo.entitlements.active),
-                hasPro: !!customerInfo.entitlements.active['pro']
+                allEntitlements: Object.keys(customerInfo.entitlements.all),
+                activeEntitlementsFull: customerInfo.entitlements.active,
+                allEntitlementsFull: customerInfo.entitlements.all,
+                hasPro: !!customerInfo.entitlements.active['pro'],
+                hasProEntitlement: !!customerInfo.entitlements.all['pro'],
+                activeSubscriptions: Object.keys(customerInfo.activeSubscriptions),
+                allPurchasedProductIdentifiers: customerInfo.allPurchasedProductIdentifiers
             });
             
-            // Check for 'pro' entitlement or any active entitlement (in case name differs)
+            // Check for 'pro' entitlement (primary check)
             const hasPro = !!customerInfo.entitlements.active['pro'];
-            const hasAnyActive = Object.keys(customerInfo.entitlements.active).length > 0;
             
-            // If purchase succeeded (no exception), consider it success even if entitlement check is delayed
-            if (hasPro || hasAnyActive) {
+            // Also check for any active entitlements (in case entitlement name differs)
+            const activeEntitlementKeys = Object.keys(customerInfo.entitlements.active);
+            const hasAnyActive = activeEntitlementKeys.length > 0;
+            
+            // Check if purchase was successful by looking at active subscriptions
+            const hasActiveSubscription = Object.keys(customerInfo.activeSubscriptions).length > 0;
+            
+            // For test purchases, sometimes entitlements sync immediately, sometimes they need a moment
+            // If we have an active subscription but no entitlements yet, the purchase likely succeeded
+            // but entitlements need to sync
+            if (hasPro) {
+                console.log('Pro entitlement active - purchase successful');
                 return true;
             }
             
-            // Purchase completed but entitlement not immediately active - might be a sync delay
-            // Still return true if we got customerInfo (purchase succeeded)
-            console.log('Purchase succeeded but entitlement not immediately active - may need sync');
-            return true;
+            if (hasAnyActive) {
+                console.log('Active entitlements found:', activeEntitlementKeys);
+                return true;
+            }
+            
+            // If we have active subscriptions but no entitlements, purchase likely succeeded
+            // but entitlements are syncing (common in test mode)
+            if (hasActiveSubscription) {
+                console.log('Active subscription found but no entitlements yet - purchase likely succeeded, syncing...');
+                // Return true but note that entitlements may need a moment to sync
+                return true;
+            }
+            
+            // No active entitlements or subscriptions - purchase did not succeed
+            console.log('Purchase completed but no active entitlements or subscriptions - purchase failed');
+            return false;
         } catch (e: any) {
-            // Handle test purchase failures gracefully
+            // Handle user cancellation
             if (e.userCancelled) {
-                // User cancelled - silent
+                console.log('Purchase cancelled by user');
                 return false;
             }
-            // Check if it's a test failure (code 5 is test failure)
-            if (e.code === '5' || e.message?.includes('test purchase failure')) {
-                console.log('Test purchase failed (expected in test mode)');
+            
+            // Handle test purchase failures (RevenueCat test failure code)
+            if (e.code === '5' || e.code === 5 || e.message?.includes('test purchase failure') || e.message?.includes('no real transaction')) {
+                console.log('Test purchase failed (expected in test mode):', e.message);
                 return false;
             }
-            // Only log actual errors
-            console.error('Purchase error:', e);
+            
+            // Log other errors for debugging
+            console.error('Purchase error:', {
+                code: e.code,
+                message: e.message,
+                error: e,
+                stack: e.stack
+            });
             return false;
         }
     },
@@ -90,7 +126,39 @@ export const PurchaseService = {
 
         try {
             const customerInfo = await Purchases.getCustomerInfo();
-            return !!customerInfo.entitlements.active['pro'];
+            
+            // Log entitlement information for debugging
+            const hasPro = !!customerInfo.entitlements.active['pro'];
+            const activeEntitlements = Object.keys(customerInfo.entitlements.active);
+            const activeSubscriptions = Object.keys(customerInfo.activeSubscriptions);
+            
+            console.log('Checking Pro status:', {
+                hasPro,
+                activeEntitlements,
+                activeSubscriptions,
+                allEntitlements: Object.keys(customerInfo.entitlements.all),
+                allPurchasedProducts: customerInfo.allPurchasedProductIdentifiers
+            });
+            
+            // Check for 'pro' entitlement
+            if (hasPro) {
+                return true;
+            }
+            
+            // Also check if there are any active entitlements (in case entitlement name differs)
+            if (activeEntitlements.length > 0) {
+                console.log('Found active entitlements (not named "pro"):', activeEntitlements);
+                return true;
+            }
+            
+            // Check if there are active subscriptions (entitlements might be syncing)
+            if (activeSubscriptions.length > 0) {
+                console.log('Found active subscriptions but no entitlements yet:', activeSubscriptions);
+                // Return true if subscriptions exist - entitlements may be syncing
+                return true;
+            }
+            
+            return false;
         } catch (e) {
             console.error('Error checking pro status:', e);
             return false;

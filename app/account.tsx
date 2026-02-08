@@ -94,11 +94,17 @@ export default function SettingsScreen() {
                         </View>
                         <View style={styles.profileInfo}>
                             <ThemedText variant="h3" weight="medium">{displayName}</ThemedText>
-                            <TouchableOpacity onPress={() => !isPro && router.push('/paywall')}>
-                                <ThemedText variant="caption" color={isPro ? Colors.dark.accent : Colors.dark.textSecondary} weight="bold">
-                                    {isPro ? "PRO PLAN" : "FREE PLAN (Upgrade)"}
+                            {isPro ? (
+                                <ThemedText variant="caption" color={Colors.dark.accent} weight="bold">
+                                    PRO PLAN
                                 </ThemedText>
-                            </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity onPress={() => router.push('/paywall')}>
+                                    <ThemedText variant="caption" color={Colors.dark.textSecondary} weight="bold">
+                                        FREE PLAN (Upgrade)
+                                    </ThemedText>
+                                </TouchableOpacity>
+                            )}
                         </View>
                         <TouchableOpacity style={styles.editButton} onPress={() => router.push('/profile/edit')}>
                             <Ionicons name="pencil" size={16} color={Colors.dark.textSecondary} />

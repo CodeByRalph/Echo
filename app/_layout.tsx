@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Colors } from '../src/constants/Colors';
 import { supabase } from '../src/lib/supabase';
 import { NotificationService } from '../src/services/notifications';
+import { PurchaseService } from '../src/services/purchase';
 import { useStore } from '../src/store/useStore';
 
 export default function RootLayout() {
@@ -16,7 +17,12 @@ export default function RootLayout() {
   const router = useRouter();
 
   useEffect(() => {
+    // Initialize services
     NotificationService.init();
+    PurchaseService.init().then(() => {
+      // Check pro status after RevenueCat is initialized
+      useStore.getState().checkProStatus().catch(e => console.error('Pro status check failed:', e));
+    });
 
     // Auth Listener
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -78,7 +84,6 @@ export default function RootLayout() {
         <Stack.Screen name="category/create" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="profile/edit" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="family/setup" options={{ presentation: 'modal', headerShown: false }} />
-        <Stack.Screen name="+not-found" />
         <Stack.Screen name="account" options={{ headerShown: false }} />
         <Stack.Screen name="stream/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="stream/create" options={{ presentation: 'modal', headerShown: false }} />

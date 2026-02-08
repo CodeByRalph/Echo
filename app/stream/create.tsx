@@ -188,7 +188,7 @@ export default function CreateStreamScreen() {
                 </View>
 
                 <View style={styles.footer}>
-                    <Button title={isSubmitting ? "Publishing..." : "Publish Stream"} onPress={handleSubmit} isLoading={isSubmitting} />
+                    <Button title={isSubmitting ? "Publishing..." : "Publish Stream"} onPress={handleSubmit} loading={isSubmitting} />
                 </View>
             </ScrollView>
         </Layout>

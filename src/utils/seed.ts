@@ -13,7 +13,9 @@ export function seedData() {
         status: 'active',
         due_at: addMinutes(now, 30).toISOString(),
         next_fire_at: addMinutes(now, 30).toISOString(),
-        recurrence: { type: 'none' }
+        recurrence: { type: 'none' },
+        snooze_count: 0,
+        version: 1
     });
 
     store.addReminder({
@@ -21,7 +23,9 @@ export function seedData() {
         status: 'active',
         due_at: addDays(now, 1).toISOString(),
         next_fire_at: addDays(now, 1).toISOString(),
-        recurrence: { type: 'monthly', dayOfMonth: 1 }
+        recurrence: { type: 'monthly', dayOfMonth: 1 },
+        snooze_count: 0,
+        version: 1
     });
 
     const tomorrowMorning = new Date(addDays(now, 1));
@@ -32,6 +36,8 @@ export function seedData() {
         status: 'active',
         due_at: tomorrowMorning.toISOString(),
         next_fire_at: tomorrowMorning.toISOString(),
-        recurrence: { type: 'weekdays' }
+        recurrence: { type: 'weekdays' },
+        snooze_count: 0,
+        version: 1
     });
 }

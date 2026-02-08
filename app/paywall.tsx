@@ -244,7 +244,7 @@ export default function PaywallScreen() {
                     {/* Features Section */}
                     <View style={styles.featuresSection}>
                         <ThemedText variant="h3" weight="semibold" style={styles.sectionTitle}>
-                            What's included
+                            What&apos;s included
                         </ThemedText>
                         <View style={styles.features}>
                             <FeatureItem icon="folder-open" text="Unlimited lists and categories" />

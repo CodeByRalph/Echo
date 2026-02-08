@@ -15,8 +15,9 @@ export default function CategoryDetailScreen() {
     const router = useRouter();
     const categories = useStore(state => state.categories);
     const reminders = useStore(state => state.reminders);
-    const currentHousehold = useStore(state => state.currentHousehold);
-    const completeReminder = useStore(state => state.completeReminder);
+    const households = useStore(state => state.households);
+    const activeHouseholdId = useStore(state => state.activeHouseholdId);
+    const currentHousehold = households.find(h => h.id === activeHouseholdId);
 
     let category = categories.find(c => c.id === id);
     let categoryReminders = [];

@@ -13,7 +13,9 @@ export function CategoryGrid() {
     const reminders = useStore((state) => state.reminders);
     const isPro = useStore((state) => state.isPro);
     const togglePro = useStore((state) => state.togglePro); // Temp for demo
-    const currentHousehold = useStore((state) => state.currentHousehold);
+    const households = useStore((state) => state.households);
+    const activeHouseholdId = useStore((state) => state.activeHouseholdId);
+    const currentHousehold = households.find(h => h.id === activeHouseholdId);
     const router = useRouter();
     const [showProSheet, setShowProSheet] = useState(false);
 

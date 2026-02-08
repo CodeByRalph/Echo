@@ -106,7 +106,7 @@ export default function StreamDetailsScreen() {
                     <Button
                         title={subscribing ? "Following..." : "Follow & Import"}
                         onPress={handleSubscribe}
-                        isLoading={subscribing}
+                        loading={subscribing}
                     />
                     <ThemedText variant="caption" color={Colors.dark.textMuted} style={{ marginTop: 12, textAlign: 'center' }}>
                         This will add {stream.items?.length || 0} recurring reminders to your schedule starting today.

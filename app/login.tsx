@@ -84,7 +84,7 @@ export default function LoginScreen() {
 
                     <TouchableOpacity onPress={() => router.push('/signup')} disabled={loading} style={styles.signUpBtn}>
                         <ThemedText variant="caption" color={Colors.dark.textSecondary}>
-                            Don't have an account? <ThemedText color={Colors.dark.primary} weight="bold">Sign Up</ThemedText>
+                            Don&apos;t have an account? <ThemedText color={Colors.dark.primary} weight="bold">Sign Up</ThemedText>
                         </ThemedText>
                     </TouchableOpacity>
                 </BlurView>

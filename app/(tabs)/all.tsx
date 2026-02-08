@@ -53,7 +53,7 @@ export default function AllScreen() {
                         title={item.title}
                         time={formatDueTime(item.next_fire_at)}
                         isRecurring={item.recurrence.type !== 'none'}
-                        isCompleted={item.status === 'done' || item.status === 'completed'}
+                        isCompleted={item.status === 'done'}
                         onComplete={() => useStore.getState().completeReminder(item.id)}
                         onDelete={() => useStore.getState().deleteReminder(item.id)}
                         onEdit={() => router.push({ pathname: '/modal', params: { id: item.id } })}

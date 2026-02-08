@@ -13,6 +13,7 @@ interface ReminderCardProps {
     title: string;
     time: string;
     isCompleted?: boolean;
+    isRecurring?: boolean;
     onComplete: () => void;
     onDelete: () => void;
     onEdit: () => void;

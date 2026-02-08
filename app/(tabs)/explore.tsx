@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Layout } from '../../src/components/Layout';
 import { StreamCard } from '../../src/components/StreamCard';
 import { ThemedText } from '../../src/components/ThemedText';
@@ -12,6 +12,7 @@ export default function ExploreScreen() {
     const router = useRouter();
     const publicStreams = useStore((state) => state.publicStreams);
     const fetchPublicStreams = useStore((state) => state.fetchPublicStreams);
+    const isPro = useStore((state) => state.isPro);
     const [refreshing, setRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -25,6 +26,17 @@ export default function ExploreScreen() {
         setRefreshing(false);
     };
 
+    const handleCreateStream = () => {
+        if (!isPro) {
+            Alert.alert("Echo Pro Required", "Only Pro members can create public community lists.", [
+                { text: "Cancel", style: "cancel" },
+                { text: "Upgrade", onPress: () => router.push('/paywall') }
+            ]);
+        } else {
+            router.push('/stream/create');
+        }
+    };
+
     const filteredStreams = publicStreams.filter(s =>
         s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (s.category && s.category.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -34,7 +46,7 @@ export default function ExploreScreen() {
         <Layout>
             <View style={styles.header}>
                 <ThemedText variant="h1" weight="bold">Explore</ThemedText>
-                <TouchableOpacity onPress={() => router.push('/stream/create')}>
+                <TouchableOpacity onPress={handleCreateStream}>
                     <Ionicons name="add-circle-outline" size={28} color={Colors.dark.primary} />
                 </TouchableOpacity>
             </View>

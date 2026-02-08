@@ -13,9 +13,12 @@ export default function SettingsScreen() {
     const userId = useStore((state) => state.userId);
     const settings = useStore((state) => state.settings);
     const updateSettings = useStore((state) => state.updateSettings);
+    const isPro = useStore((state) => state.isPro);
 
-    // Placeholder for user email - in a real app we'd store the email in the store or fetch it
-    const userEmail = userId ? `User ${userId.substring(0, 4)}...${userId.substring(userId.length - 4)}` : 'Guest';
+    const userProfile = useStore((state) => state.userProfile);
+
+    const displayName = userProfile?.full_name || userProfile?.email || 'Guest';
+    const initial = displayName.charAt(0).toUpperCase();
 
     const handleSignOut = async () => {
         await signOut();
@@ -25,6 +28,20 @@ export default function SettingsScreen() {
     const handleNotificationsToggle = (value: boolean) => {
         updateSettings({ notifications_enabled: value });
     };
+
+    const handleSnoozePress = () => {
+        if (!isPro) {
+            Alert.alert("Echo Pro Required", "Customize your snooze times with Echo Pro.", [
+                { text: "Cancel", style: "cancel" },
+                { text: "Upgrade", onPress: () => router.push('/paywall') }
+            ]);
+        } else {
+            router.push('/snooze-settings');
+        }
+    };
+
+    // ... helper function SettingItem ... (omitted for brevity in replacement if unchanged, but I need to include it if I'm replacing a block containing it)
+    // Actually, I can just replace the specific lines around the SettingItem usage in the return.
 
     const SettingItem = ({ icon, title, value, type = 'arrow', onPress, switchValue, onSwitchChange }: {
         icon: string,
@@ -72,15 +89,19 @@ export default function SettingsScreen() {
                     <View style={styles.profileCard}>
                         <View style={styles.avatar}>
                             <ThemedText variant="h2" weight="bold" style={{ color: Colors.dark.background }}>
-                                {userEmail.charAt(0).toUpperCase()}
+                                {initial}
                             </ThemedText>
                         </View>
                         <View style={styles.profileInfo}>
-                            <ThemedText variant="h3" weight="medium">{userEmail}</ThemedText>
-                            <ThemedText variant="caption" color={Colors.dark.textSecondary}>Free Plan</ThemedText>
+                            <ThemedText variant="h3" weight="medium">{displayName}</ThemedText>
+                            <TouchableOpacity onPress={() => !isPro && router.push('/paywall')}>
+                                <ThemedText variant="caption" color={isPro ? Colors.dark.accent : Colors.dark.textSecondary} weight="bold">
+                                    {isPro ? "PRO PLAN" : "FREE PLAN (Upgrade)"}
+                                </ThemedText>
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity style={styles.editButton} onPress={() => Alert.alert("Coming Soon", "Profile editing will be available in a future update.")}>
-                            <ThemedText color={Colors.dark.primary}>Edit</ThemedText>
+                        <TouchableOpacity style={styles.editButton} onPress={() => router.push('/profile/edit')}>
+                            <Ionicons name="pencil" size={16} color={Colors.dark.textSecondary} />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -92,8 +113,8 @@ export default function SettingsScreen() {
                         <SettingItem
                             icon="time-outline"
                             title="Snooze Presets"
-                            value={`${settings.snooze_presets_mins.join(', ')}m`}
-                            onPress={() => router.push('/snooze-settings')}
+                            value={isPro ? `${settings.snooze_presets_mins.join(', ')}m` : "Default"}
+                            onPress={handleSnoozePress}
                         />
                         <View style={styles.separator} />
                         <SettingItem

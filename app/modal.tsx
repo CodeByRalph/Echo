@@ -1,177 +1,170 @@
 import { Ionicons } from '@expo/vector-icons';
-import RNDateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Button } from '../src/components/Button';
-import { Input } from '../src/components/Input';
 import { Layout } from '../src/components/Layout';
 import { ThemedText } from '../src/components/ThemedText';
 import { Colors } from '../src/constants/Colors';
 import { useStore } from '../src/store/useStore';
-import { Reminder } from '../src/types';
 
-export default function ModalScreen() {
-    const params = useLocalSearchParams();
-    const id = typeof params.id === 'string' ? params.id : undefined;
-
-    const [title, setTitle] = useState('');
-    const [notes, setNotes] = useState('');
-    const [date, setDate] = useState(new Date());
-    const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined);
-
-    const addReminder = useStore((state) => state.addReminder);
-    const updateReminder = useStore((state) => state.updateReminder);
-    const reminders = useStore((state) => state.reminders);
-    const categories = useStore((state) => state.categories);
+export default function ReminderModal() {
+    const { id } = useLocalSearchParams<{ id?: string }>();
     const router = useRouter();
+    const store = useStore();
+    const reminder = id ? store.reminders.find(r => r.id === id) : null;
 
-    useEffect(() => {
-        if (id) {
-            const reminder = reminders.find(r => r.id === id);
-            if (reminder) {
-                setTitle(reminder.title);
-                setNotes(reminder.notes || '');
-                setDate(new Date(reminder.due_at));
-                setSelectedCategoryId(reminder.category_id);
-            }
+    const [title, setTitle] = useState(reminder?.title || '');
+    const [dueTime, setDueTime] = useState(reminder ? new Date(reminder.next_fire_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '12:00');
+    const [categoryId, setCategoryId] = useState<string | undefined>(reminder?.category_id || store.categories[0]?.id);
+    const [householdId, setHouseholdId] = useState<string | undefined>(reminder?.household_id || undefined);
+
+    const handleSave = async () => {
+        if (!title.trim()) {
+            Alert.alert("Required", "Please enter a title.");
+            return;
         }
-    }, [id]);
 
-    const handleSave = () => {
-        if (!title.trim()) return;
-
-        const payload: Partial<Reminder> & { status?: string, version?: number } = {
-            title,
-            notes,
-            due_at: date.toISOString(),
-            next_fire_at: date.toISOString(),
-            recurrence: { type: 'none', interval: 1 },
-            // If family selected, set household_id, else set category_id
-            household_id: selectedCategoryId === 'family-household' ? useStore.getState().currentHousehold?.id : undefined,
-            category_id: selectedCategoryId === 'family-household' ? undefined : selectedCategoryId,
-        };
+        // Parse time
+        const [hours, minutes] = dueTime.split(':').map(Number);
+        const nextFire = new Date();
+        nextFire.setHours(hours, minutes, 0, 0);
+        if (nextFire < new Date()) nextFire.setDate(nextFire.getDate() + 1);
 
         if (id) {
-            updateReminder(id, payload);
+            store.updateReminder(id, {
+                title,
+                next_fire_at: nextFire.toISOString(),
+                category_id: categoryId,
+                household_id: householdId
+            });
         } else {
-            addReminder({
-                ...payload,
+            store.addReminder({
+                title,
+                due_at: nextFire.toISOString(),
+                next_fire_at: nextFire.toISOString(),
+                category_id: categoryId || store.categories[0]?.id,
+                household_id: householdId,
+                recurrence: { type: 'none' },
                 status: 'active',
-                recurrence: { type: 'none', interval: 1 }, // Type fix
                 version: 1,
-            } as any);
+                snooze_count: 0
+            });
         }
-
         router.back();
     };
 
     return (
         <Layout>
-            <ScrollView contentContainerStyle={{ paddingVertical: 24, gap: 24 }}>
-
-                <View>
-                    <ThemedText variant="label" style={{ marginBottom: 8 }}>What needs doing?</ThemedText>
-                    <Input
-                        placeholder="Buy groceries..."
+            <ScrollView contentContainerStyle={styles.container}>
+                <View style={styles.section}>
+                    <ThemedText variant="label" style={{ marginBottom: 8 }}>WHAT'S THE TASK?</ThemedText>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="e.g. Call Mom"
+                        placeholderTextColor={Colors.dark.textMuted}
                         value={title}
                         onChangeText={setTitle}
-                    />
-                    <Input
-                        placeholder="Notes (optional)"
-                        value={notes}
-                        onChangeText={setNotes}
-                        multiline
-                        style={{ height: 80, textAlignVertical: 'top' }}
+                        autoFocus
                     />
                 </View>
 
-                <View>
-                    <ThemedText variant="label" style={{ marginBottom: 8 }}>When?</ThemedText>
-                    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                        <RNDateTimePicker
-                            value={date}
-                            mode="date"
-                            display="default"
-                            onChange={(e, d) => d && setDate(d)}
-                            themeVariant="dark"
-                            style={{ flex: 1 }}
-                        />
-                        <RNDateTimePicker
-                            value={date}
-                            mode="time"
-                            display="default"
-                            onChange={(e, d) => d && setDate(d)}
-                            themeVariant="dark"
-                            style={{ flex: 1 }}
-                        />
-                    </View>
+                <View style={styles.section}>
+                    <ThemedText variant="label" style={{ marginBottom: 8 }}>TIME</ThemedText>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="12:00"
+                        placeholderTextColor={Colors.dark.textMuted}
+                        value={dueTime}
+                        onChangeText={setDueTime}
+                    />
                 </View>
 
-                <View>
-                    <ThemedText variant="label" style={{ marginBottom: 8 }}>List</ThemedText>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                        {/* Family Space Option */}
-                        {useStore((state) => state.currentHousehold) && (
-                            <TouchableOpacity
-                                key="family-household"
-                                onPress={() => setSelectedCategoryId('family-household')}
-                                style={[
-                                    styles.chip,
-                                    selectedCategoryId === 'family-household' && { backgroundColor: Colors.dark.accent, borderColor: Colors.dark.accent },
-                                ]}
-                            >
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name="people" size={16} color={selectedCategoryId === 'family-household' ? 'white' : Colors.dark.accent} style={{ marginRight: 6 }} />
-                                    <ThemedText style={{ color: selectedCategoryId === 'family-household' ? 'white' : Colors.dark.textSecondary }}>
-                                        {useStore((state) => state.currentHousehold)!.name}
-                                    </ThemedText>
-                                </View>
-                            </TouchableOpacity>
-                        )}
-
-                        {categories.map(cat => (
+                <View style={styles.section}>
+                    <ThemedText variant="label" style={{ marginBottom: 12 }}>CATEGORY</ThemedText>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
+                        {store.categories.map(cat => (
                             <TouchableOpacity
                                 key={cat.id}
-                                onPress={() => setSelectedCategoryId(cat.id)}
                                 style={[
-                                    styles.chip,
-                                    selectedCategoryId === cat.id && { backgroundColor: cat.color, borderColor: cat.color },
-                                    !selectedCategoryId && cat.isDefault && cat.id === 'default-work' && { borderColor: 'transparent' }
+                                    styles.categoryBadge,
+                                    categoryId === cat.id && { backgroundColor: cat.color + '40' },
+                                    categoryId === cat.id && { borderColor: cat.color }
                                 ]}
+                                onPress={() => setCategoryId(cat.id)}
                             >
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Ionicons name={cat.icon as any} size={16} color={selectedCategoryId === cat.id ? 'white' : cat.color} style={{ marginRight: 6 }} />
-                                    <ThemedText style={{ color: selectedCategoryId === cat.id ? 'white' : Colors.dark.textSecondary }}>
-                                        {cat.name}
-                                    </ThemedText>
-                                </View>
+                                <Ionicons name={cat.icon as any || 'folder-outline'} size={18} color={cat.color} />
+                                <ThemedText style={{ marginLeft: 6, color: cat.color }}>{cat.name}</ThemedText>
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
                 </View>
 
-                <View style={{ marginTop: 32, gap: 12 }}>
-                    <Button title={id ? "Save Changes" : "Create Reminder"} onPress={handleSave} />
-                    <Button title="Cancel" variant="ghost" onPress={() => router.back()} />
-                </View>
+                {store.households.length > 0 && (
+                    <View style={styles.section}>
+                        <ThemedText variant="label" style={{ marginBottom: 12 }}>SHARE WITH FAMILY?</ThemedText>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.categoryBadge,
+                                    householdId === undefined && { backgroundColor: Colors.dark.surfaceHighlight },
+                                ]}
+                                onPress={() => setHouseholdId(undefined)}
+                            >
+                                <ThemedText color={householdId === undefined ? Colors.dark.text : Colors.dark.textSecondary}>Private</ThemedText>
+                            </TouchableOpacity>
+                            {store.households.map(h => (
+                                <TouchableOpacity
+                                    key={h.id}
+                                    style={[
+                                        styles.categoryBadge,
+                                        householdId === h.id && { backgroundColor: Colors.dark.primary + '40' },
+                                        householdId === h.id && { borderColor: Colors.dark.primary }
+                                    ]}
+                                    onPress={() => setHouseholdId(h.id)}
+                                >
+                                    <Ionicons name="home-outline" size={18} color={householdId === h.id ? Colors.dark.primary : Colors.dark.textSecondary} />
+                                    <ThemedText style={{ marginLeft: 6, color: householdId === h.id ? Colors.dark.primary : Colors.dark.textSecondary }}>{h.name}</ThemedText>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
 
+                <View style={{ marginTop: 24 }}>
+                    <Button title={id ? "Save Changes" : "Add Reminder"} onPress={handleSave} />
+                    <Button title="Cancel" variant="ghost" onPress={() => router.back()} style={{ marginTop: 8 }} />
+                </View>
             </ScrollView>
         </Layout>
     );
 }
 
 const styles = StyleSheet.create({
-    chip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: Colors.dark.surfaceHighlight,
-        borderWidth: 1,
-        borderColor: 'transparent',
+    container: {
+        padding: 20,
     },
-    chipActive: {
-        backgroundColor: Colors.dark.primary,
-        borderColor: Colors.dark.primary,
+    section: {
+        marginBottom: 24,
+    },
+    input: {
+        backgroundColor: Colors.dark.surface,
+        borderRadius: 12,
+        padding: 16,
+        color: Colors.dark.text,
+        fontSize: 18,
+    },
+    categoryRow: {
+        flexDirection: 'row',
+    },
+    categoryBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: Colors.dark.surfaceHighlight,
+        marginRight: 10,
     }
 });

@@ -1,8 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import { Button } from '../src/components/Button';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Layout } from '../src/components/Layout';
 import { ThemedText } from '../src/components/ThemedText';
 import { Colors } from '../src/constants/Colors';
@@ -12,105 +11,168 @@ export default function SnoozeSettingsScreen() {
     const router = useRouter();
     const settings = useStore((state) => state.settings);
     const updateSettings = useStore((state) => state.updateSettings);
+    const isPro = useStore((state) => state.isPro);
 
-    const [preset1, setPreset1] = useState(settings.snooze_presets_mins[0].toString());
-    const [preset2, setPreset2] = useState(settings.snooze_presets_mins[1].toString());
-    const [preset3, setPreset3] = useState(settings.snooze_presets_mins[2].toString());
+    // Local state for adding new preset
+    const [newPreset, setNewPreset] = useState('');
 
-    const handleSave = () => {
-        const v1 = parseInt(preset1, 10);
-        const v2 = parseInt(preset2, 10);
-        const v3 = parseInt(preset3, 10);
+    const presets = settings.snooze_presets_mins || [10, 60, 1440];
 
-        if (isNaN(v1) || IsNaN(v2) || isNaN(v3) || v1 <= 0 || v2 <= 0 || v3 <= 0) {
-            Alert.alert("Invalid Input", "Please enter valid positive numbers for all presets.");
+    const handleAddPreset = () => {
+        if (!isPro) return; // Should be blocked by entry, but safe guard
+
+        const mins = parseInt(newPreset, 10);
+        if (isNaN(mins) || mins <= 0) {
+            Alert.alert("Invalid Input", "Please enter a positive number of minutes.");
             return;
         }
 
-        updateSettings({ snooze_presets_mins: [v1, v2, v3] });
-        router.back();
+        if (presets.includes(mins)) {
+            Alert.alert("Duplicate", "This preset already exists.");
+            return;
+        }
+
+        const newPresets = [...presets, mins].sort((a, b) => a - b);
+        updateSettings({ snooze_presets_mins: newPresets });
+        setNewPreset('');
     };
 
-    // Helper workaround for isNaN type check if strict
-    function IsNaN(v: number) { return isNaN(v); }
+    const handleDeletePreset = (val: number) => {
+        if (presets.length <= 1) {
+            Alert.alert("Cannot Remove", "You must have at least one snooze option.");
+            return;
+        }
+        const newPresets = presets.filter(p => p !== val);
+        updateSettings({ snooze_presets_mins: newPresets });
+    };
 
-    const PresetInput = ({ label, value, onChange }: { label: string, value: string, onChange: (t: string) => void }) => (
-        <View style={styles.inputContainer}>
-            <ThemedText style={styles.label}>{label}</ThemedText>
-            <View style={styles.inputWrapper}>
-                <TextInput
-                    style={styles.input}
-                    value={value}
-                    onChangeText={onChange}
-                    keyboardType="number-pad"
-                    placeholderTextColor={Colors.dark.textMuted}
-                />
-                <ThemedText style={styles.suffix}>min</ThemedText>
-            </View>
-        </View>
-    );
+    const formatDuration = (mins: number) => {
+        if (mins < 60) return `${mins}m`;
+        if (mins % 60 === 0) return `${mins / 60}h`;
+        return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+    };
+
+    if (!isPro) {
+        // Redundant safety if they navigate here manually
+        return (
+            <Layout>
+                <View style={styles.center}>
+                    <ThemedText>Pro-only feature.</ThemedText>
+                    <TouchableOpacity onPress={() => router.replace('/paywall')}>
+                        <ThemedText color={Colors.dark.primary}>Upgrade</ThemedText>
+                    </TouchableOpacity>
+                </View>
+            </Layout>
+        );
+    }
 
     return (
         <Layout>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 16 }}>
-                    <Ionicons name="close" size={28} color={Colors.dark.primary} />
+                    <Ionicons name="chevron-back" size={28} color={Colors.dark.primary} />
                 </TouchableOpacity>
-                <ThemedText variant="h1" weight="bold">Snooze Presets</ThemedText>
+                <ThemedText variant="h1" weight="bold">Snooze Settings</ThemedText>
             </View>
 
-            <View style={styles.content}>
-                <ThemedText color={Colors.dark.textSecondary} style={{ marginBottom: 32 }}>
-                    Customize the three quick-snooze options available in notifications and the app.
+            <ScrollView contentContainerStyle={styles.content}>
+                <ThemedText color={Colors.dark.textSecondary} style={{ marginBottom: 24 }}>
+                    Customize the quick snooze options that appear when you delay a reminder.
                 </ThemedText>
 
-                <PresetInput label="Short Snooze (Option 1)" value={preset1} onChange={setPreset1} />
-                <PresetInput label="Medium Snooze (Option 2)" value={preset2} onChange={setPreset2} />
-                <PresetInput label="Long Snooze (Option 3)" value={preset3} onChange={setPreset3} />
+                <View style={styles.list}>
+                    {presets.map((mins) => (
+                        <View key={mins} style={styles.item}>
+                            <View style={styles.itemLeft}>
+                                <Ionicons name="time-outline" size={20} color={Colors.dark.text} />
+                                <ThemedText style={{ marginLeft: 12, fontSize: 16 }}>{formatDuration(mins)}</ThemedText>
+                                <ThemedText variant="caption" color={Colors.dark.textMuted} style={{ marginLeft: 8 }}>({mins} min)</ThemedText>
+                            </View>
+                            <TouchableOpacity onPress={() => handleDeletePreset(mins)} style={styles.deleteButton}>
+                                <Ionicons name="trash-outline" size={20} color={Colors.dark.error} />
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                </View>
 
-                <View style={{ flex: 1 }} />
-                <Button title="Save Changes" onPress={handleSave} />
-            </View>
+                <View style={styles.addSection}>
+                    <ThemedText variant="h3" style={{ marginBottom: 12 }}>Add Preset</ThemedText>
+                    <View style={styles.inputRow}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Minutes (e.g. 30)"
+                            placeholderTextColor={Colors.dark.textMuted}
+                            keyboardType="number-pad"
+                            value={newPreset}
+                            onChangeText={setNewPreset}
+                        />
+                        <TouchableOpacity style={styles.addButton} onPress={handleAddPreset}>
+                            <ThemedText weight="bold" color="white">Add</ThemedText>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </ScrollView>
         </Layout>
     );
 }
 
 const styles = StyleSheet.create({
+    center: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     header: {
         marginTop: 20,
-        marginBottom: 24,
+        marginBottom: 16,
         flexDirection: 'row',
         alignItems: 'center',
     },
     content: {
-        flex: 1,
-        paddingHorizontal: 8,
+        paddingBottom: 40,
     },
-    inputContainer: {
-        marginBottom: 24,
-    },
-    label: {
-        marginBottom: 8,
-        color: Colors.dark.textSecondary,
-    },
-    inputWrapper: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    list: {
         backgroundColor: Colors.dark.surface,
         borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderWidth: 1,
-        borderColor: Colors.dark.surfaceHighlight,
+        overflow: 'hidden',
+        marginBottom: 32,
+    },
+    item: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.dark.surfaceHighlight,
+    },
+    itemLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    deleteButton: {
+        padding: 8,
+    },
+    addSection: {
+
+    },
+    inputRow: {
+        flexDirection: 'row',
+        gap: 12,
     },
     input: {
         flex: 1,
+        backgroundColor: Colors.dark.surface,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         color: Colors.dark.text,
-        fontSize: 18,
-        padding: 0,
+        fontSize: 16,
     },
-    suffix: {
-        color: Colors.dark.textMuted,
-        marginLeft: 8,
+    addButton: {
+        backgroundColor: Colors.dark.primary,
+        borderRadius: 12,
+        paddingHorizontal: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
     }
 });

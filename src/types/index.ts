@@ -88,6 +88,7 @@ export interface Household {
     created_at: string;
     invite_code?: string; // Added via migration
     members?: HouseholdMember[]; // Hydrated
+    created_by_profile?: { full_name?: string, email: string };
 }
 
 export interface HouseholdMember {
@@ -95,7 +96,15 @@ export interface HouseholdMember {
     user_id: string;
     role: 'admin' | 'member' | 'child';
     joined_at: string;
-    profile?: { email: string }; // Hydrated
+    profile?: { email: string; full_name?: string; avatar_url?: string }; // Hydrated
+}
+
+// Main User Profile (matches Supabase 'profiles' table)
+export interface UserProfile {
+    id: string;
+    email: string;
+    full_name?: string;
+    avatar_url?: string;
 }
 
 export interface UserSettings {

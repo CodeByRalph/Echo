@@ -1,5 +1,7 @@
 import { format, isSameYear, isToday, isTomorrow, parseISO } from 'date-fns';
 
+export { isToday };
+
 export function formatDueTime(isoString: string): string {
     const date = parseISO(isoString);
     const timeStr = format(date, 'h:mm a');

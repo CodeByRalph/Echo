@@ -73,7 +73,12 @@ export default function RootLayout() {
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="signup" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'New Reminder' }} />
+        <Stack.Screen name="paywall" options={{ presentation: 'modal', headerShown: false }} />
         <Stack.Screen name="snooze-settings" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="category/create" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="profile/edit" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="family/setup" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="+not-found" />
         <Stack.Screen name="account" options={{ headerShown: false }} />
         <Stack.Screen name="stream/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="stream/create" options={{ presentation: 'modal', headerShown: false }} />

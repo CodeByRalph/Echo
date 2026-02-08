@@ -5,7 +5,8 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { Colors } from '../constants/Colors';
 import { supabase } from '../lib/supabase';
-import { Category, Household, Reminder, Stream, UserSettings } from '../types';
+import { PurchaseService } from '../services/purchase';
+import { Category, Household, Reminder, Stream, UserProfile, UserSettings } from '../types';
 import { computeNextFireAt } from '../utils/recurrence';
 
 interface AppState {
@@ -14,24 +15,29 @@ interface AppState {
     settings: UserSettings;
     isPro: boolean;
     userId: string | null;
+    userProfile: UserProfile | null;
     activity: Record<string, number>;
 
+    // Actions
     // Actions
     hydrate: () => Promise<void>;
     signOut: () => Promise<void>;
     resetState: () => void;
+    checkProStatus: () => Promise<void>;
+    purchasePro: () => Promise<void>;
+    togglePro: () => void; // Keeping for dev
 
     addReminder: (reminder: Omit<Reminder, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => void;
     updateReminder: (id: string, updates: Partial<Reminder>) => void;
     deleteReminder: (id: string) => void;
 
     addCategory: (name: string, color: string, icon?: string) => void;
-    togglePro: () => void;
 
     completeReminder: (id: string) => void;
     snoozeReminder: (id: string, minutes: number) => void;
 
     updateSettings: (updates: Partial<UserSettings>) => void;
+    updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
 
     // Community Streams
     publicStreams: Stream[];
@@ -40,13 +46,14 @@ interface AppState {
     subscribeToStream: (streamId: string) => Promise<void>;
 
     // Family Loop
-    currentHousehold: Household | null;
+    households: Household[];
+    activeHouseholdId: string | null;
     createHousehold: (name: string) => Promise<void>;
     joinHousehold: (inviteCode: string) => Promise<void>; // Mock
     fetchHouseholdMembers: () => Promise<void>;
     assignReminder: (reminderId: string, userId: string) => void;
     nagMember: (reminderId: string) => void;
-    leaveHousehold: () => Promise<void>;
+    leaveHousehold: (householdId?: string) => Promise<void>;
 }
 
 // Simple UUID v4 generator for Supabase compatibility
@@ -68,7 +75,10 @@ export const useStore = create<AppState>()(
             ],
             isPro: false,
             userId: null,
+            userProfile: null,
             activity: {},
+            households: [],
+            activeHouseholdId: null,
             settings: {
                 snooze_presets_mins: [10, 60, 180],
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -76,12 +86,15 @@ export const useStore = create<AppState>()(
             },
 
             hydrate: async () => {
+                // Check Pro Status on launch
+                await get().checkProStatus();
+
                 try {
                     const { data: { user }, error: userError } = await supabase.auth.getUser();
                     if (userError) throw userError;
 
                     if (!user) {
-                        set({ userId: null, reminders: [], activity: {}, currentHousehold: null });
+                        set({ userId: null, userProfile: null, reminders: [], activity: {}, households: [], activeHouseholdId: null });
                         return;
                     }
 
@@ -95,16 +108,32 @@ export const useStore = create<AppState>()(
                     const { data: activity, error: activityError } = await supabase.from('activity').select('*');
                     if (activityError) console.error('Activity fetch error:', activityError);
 
-                    // Fetch Household
-                    let currentHousehold = null;
-                    const { data: membership } = await supabase.from('household_members').select('household_id').eq('user_id', user.id).single();
-                    if (membership) {
-                        const { data: household } = await supabase.from('households').select('*').eq('id', membership.household_id).single();
-                        if (household) {
-                            currentHousehold = household;
-                            // Fetch members
-                            const { data: members } = await supabase.from('household_members').select('*').eq('household_id', household.id);
-                            currentHousehold.members = members || [];
+                    // Fetch Profile
+                    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+                    if (profile) set({ userProfile: profile });
+
+                    // Fetch Households
+                    let households: Household[] = [];
+                    const { data: householdMemberships } = await supabase.from('household_members').select('household_id').eq('user_id', user.id);
+
+                    if (householdMemberships && householdMemberships.length > 0) {
+                        const householdIds = householdMemberships.map(m => m.household_id);
+                        const { data: householdsData } = await supabase.from('households').select('*, created_by_profile:created_by(full_name, email)').in('id', householdIds);
+
+                        if (householdsData) {
+                            households = householdsData as any; // Need to cast due to join
+                            // Fetch members for each? Or just fetch on demand?
+                            // For MVP, let's fetch members for the first one or active one.
+                        }
+                    }
+
+                    // For now, set active to the first one found, or persisted one if we had it (but we don't persist activeHouseholdId yet)
+                    const activeHouseholdId = households.length > 0 ? households[0].id : null;
+                    if (activeHouseholdId) {
+                        const { data: members } = await supabase.from('household_members').select('*, profiles:user_id(email, full_name, avatar_url)').eq('household_id', activeHouseholdId);
+                        const activeHousehold = households.find(h => h.id === activeHouseholdId);
+                        if (activeHousehold) {
+                            activeHousehold.members = members || [];
                         }
                     }
 
@@ -123,33 +152,61 @@ export const useStore = create<AppState>()(
                             return acc;
                         }, {}),
 
-                        currentHousehold
+                        households,
+                        activeHouseholdId
                     }));
                 } catch (e) {
                     console.error('Hydration Action Failed:', e);
                 }
             },
 
-            resetState: () => {
-                set({ userId: null, reminders: [], activity: {}, currentHousehold: null });
-            },
+            resetState: () => set({ reminders: [], userId: null, userProfile: null, activity: {}, households: [], activeHouseholdId: null, publicStreams: [] }),
 
             signOut: async () => {
                 await supabase.auth.signOut();
                 get().resetState();
             },
 
+            checkProStatus: async () => {
+                await PurchaseService.init();
+                const isPro = await PurchaseService.checkProStatus();
+                set({ isPro });
+            },
+
+            purchasePro: async () => {
+                // Simplified flow: Get packages, buy first available (usually monthly/annual)
+                // For MVP, we'll try to buy the first package found
+                try {
+                    const packages = await PurchaseService.getPackages();
+                    if (packages.length > 0) {
+                        const success = await PurchaseService.purchasePackage(packages[0]);
+                        if (success) {
+                            set({ isPro: true });
+                        }
+                    }
+                } catch (e) {
+                    console.error('Purchase failed', e);
+                }
+            },
+
             addCategory: (name, color, icon) => set((state) => {
-                if (!state.userId) return {}; // Guard: must be logged in
+                if (!state.userId) return state;
+
+                // Feature Limit: Free users max 3 custom categories
+                const customCats = state.categories.filter(c => !c.isDefault);
+                if (!state.isPro && customCats.length >= 3) {
+                    Alert.alert("Echo Pro Required", "Free users can only create 3 custom lists. Upgrade to create unlimited lists.");
+                    return state;
+                }
 
                 const newCategory: Category = {
                     id: generateId(),
                     name,
                     color,
                     icon,
+                    isDefault: false
                 };
 
-                // Async DB Insert
                 supabase.from('categories').insert({
                     id: newCategory.id,
                     user_id: state.userId,
@@ -167,7 +224,7 @@ export const useStore = create<AppState>()(
             togglePro: () => set((state) => ({ isPro: !state.isPro })),
 
             addReminder: (reminderData) => set((state) => {
-                if (!state.userId) return {}; // Guard
+                if (!state.userId) return state;
 
                 const now = new Date().toISOString();
                 const newReminder: Reminder = {
@@ -310,9 +367,32 @@ export const useStore = create<AppState>()(
                 };
             }),
 
-            updateSettings: (updates) => set((state) => ({
-                settings: { ...state.settings, ...updates }
-            })),
+            updateSettings: (updates) => set((state) => {
+                if ('snooze_presets_mins' in updates && !state.isPro) {
+                    Alert.alert("Echo Pro Required", "Custom snooze presets are a Pro feature.");
+                    // Remove the restricted key but allow other updates
+                    const { snooze_presets_mins, ...allowedUpdates } = updates;
+                    return { settings: { ...state.settings, ...allowedUpdates } };
+                }
+                return { settings: { ...state.settings, ...updates } };
+            }),
+
+            updateProfile: async (updates) => {
+                const state = get();
+                if (!state.userId) return;
+
+                const { error } = await supabase.from('profiles').update(updates).eq('id', state.userId);
+
+                if (error) {
+                    console.error("Error updating profile:", error);
+                    Alert.alert("Error", "Failed to update profile.");
+                    return;
+                }
+
+                set((state) => ({
+                    userProfile: state.userProfile ? { ...state.userProfile, ...updates } : null
+                }));
+            },
 
             // Community Streams Actions
             publicStreams: [],
@@ -325,9 +405,8 @@ export const useStore = create<AppState>()(
                     .order('likes_count', { ascending: false });
 
                 if (error || !data || data.length === 0) {
-                    console.log('No streams found in DB or error, using mock data');
-                    const { MOCK_STREAMS } = require('../data/mockStreams');
-                    set({ publicStreams: MOCK_STREAMS });
+                    // Mock fall back
+                    set({ publicStreams: [] });
                     return;
                 }
 
@@ -337,6 +416,12 @@ export const useStore = create<AppState>()(
             createStream: async (title, description, items) => {
                 const state = get();
                 if (!state.userId) return;
+
+                // Feature Limit: Free users cannot create streams
+                if (!state.isPro) {
+                    Alert.alert("Echo Pro Required", "Only Pro members can create public community lists.");
+                    return;
+                }
 
                 const streamId = generateId();
                 const now = new Date().toISOString();
@@ -353,7 +438,7 @@ export const useStore = create<AppState>()(
                 });
 
                 if (streamError) {
-                    console.error('Error creating stream:', streamError);
+                    Alert.alert("Error", "Failed to create stream.");
                     return;
                 }
 
@@ -368,8 +453,7 @@ export const useStore = create<AppState>()(
                         time_of_day: item.time_of_day
                     }));
 
-                    const { error: itemsError } = await supabase.from('stream_items').insert(streamItems);
-                    if (itemsError) console.error('Error creating stream items:', itemsError);
+                    await supabase.from('stream_items').insert(streamItems);
                 }
 
                 // Refresh
@@ -380,13 +464,10 @@ export const useStore = create<AppState>()(
                 const state = get();
                 if (!state.userId) return;
 
-                // Fetch stream details if not in list
+                // Free users CAN subscribe, so no check here.
+
                 let stream = state.publicStreams.find(s => s.id === streamId);
-                if (!stream) {
-                    // fetch... for now assume it's in the list or handle later
-                    console.log('Stream not found in cache');
-                    return;
-                }
+                if (!stream) return;
 
                 // Create subscription record
                 await supabase.from('stream_subscriptions').insert({
@@ -430,117 +511,130 @@ export const useStore = create<AppState>()(
 
                 // Bulk insert reminders
                 // Note: Supabase insert can take an array
-                const { error } = await supabase.from('reminders').insert(newReminders);
-                if (error) console.error('Error importing stream reminders:', error);
-
-                set(s => ({
-                    reminders: [...s.reminders, ...newReminders]
-                }));
+                await supabase.from('reminders').insert(newReminders);
+                set(s => ({ reminders: [...s.reminders, ...newReminders] }));
             },
 
             // Family Loop Actions
-            currentHousehold: null,
 
             createHousehold: async (name) => {
                 const state = get();
                 if (!state.userId) return;
+
+                // Feature Limit: Free users Max 1 Family
+                if (!state.isPro && state.households.length >= 1) {
+                    Alert.alert("Echo Pro Required", "Free users can only have one family space. Upgrade to create another.");
+                    return;
+                }
+
+                // Temporary: Enforce 1 family limit for everyone until UI supports switching fully
+                // Actually, the UI request IS to support list. So for Pro, we allow more.
 
                 const now = new Date().toISOString();
 
                 // Call secure RPC
                 const { data, error } = await supabase.rpc('create_household', { name_input: name });
 
-                if (error) {
-                    console.error('RPC Error creating household:', error);
-                    Alert.alert("Error", "Network error creating household.");
+                if (error || !data.success) {
+                    Alert.alert("Failed", data?.message || "Could not create household.");
                     return;
                 }
 
-                if (!data.success) {
-                    Alert.alert("Failed", data.message || "Could not create household.");
-                    return;
-                }
+                // Fetch the Creator Profile (current user)
+                // Or just mock it since we know it's us?
+                // Ideally we have state.userProfile
+                const creatorProfile = state.userProfile || { email: 'me' };
 
+                const newHousehold: Household = {
+                    id: data.household_id,
+                    name,
+                    created_by: state.userId!,
+                    created_at: now,
+                    members: [], // will fetch
+                    invite_code: data.invite_code,
+                    // @ts-ignore
+                    created_by_profile: creatorProfile
+                };
+
+                // Add to list and make active
                 set({
-                    currentHousehold: {
-                        id: data.household_id,
-                        name,
-                        created_by: state.userId!,
-                        created_at: now,
-                        members: [{
-                            household_id: data.household_id,
-                            user_id: state.userId!,
-                            role: 'admin',
-                            joined_at: now,
-                            profile: { email: 'me@example.com' } // Mock until refresh
-                        }],
-                        invite_code: data.invite_code
-                    }
+                    households: [...state.households, newHousehold],
+                    activeHouseholdId: newHousehold.id
                 });
+
+                await state.fetchHouseholdMembers();
             },
 
             joinHousehold: async (inviteCode) => {
                 const state = get();
                 if (!state.userId) return;
 
+                // Feature Limit: Free users Max 1 Family
+                if (!state.isPro && state.households.length >= 1) {
+                    Alert.alert("Echo Pro Required", "Free users can only join one family space.");
+                    return;
+                }
+
+                // Check if already in it? (RPC handles it usually, but we can check locally)
+
                 // Call secure RPC
                 const { data, error } = await supabase.rpc('join_household', { invite_code_input: inviteCode });
 
-                if (error) {
-                    console.error('RPC Error:', error);
-                    Alert.alert("Error", "Network error joining household.");
-                    throw error; // Throw so UI knows it failed
-                }
-
-                if (!data.success) {
-                    Alert.alert("Failed", data.message || "Could not join household.");
-                    throw new Error(data.message);
+                if (error || !data.success) {
+                    Alert.alert("Failed", data?.message || "Could not join household.");
+                    return;
                 }
 
                 // Success
-                // Fetch household details to update local state immediately
-                const { data: household } = await supabase.from('households').select('*').eq('id', data.household_id).single();
+                // Fetch household details
+                const { data: household } = await supabase.from('households').select('*, created_by_profile:created_by(full_name, email)').eq('id', data.household_id).single();
 
                 if (household) {
                     set({
-                        currentHousehold: {
-                            ...household,
-                            members: []
-                        }
+                        households: [...state.households, household as any],
+                        activeHouseholdId: household.id
                     });
-                    await state.fetchHouseholdMembers();
+                    await get().fetchHouseholdMembers();
                 }
             },
 
-            leaveHousehold: async () => {
+            leaveHousehold: async (householdId) => {
                 const state = get();
-                if (!state.userId || !state.currentHousehold) return;
+                const targetId = householdId || state.activeHouseholdId;
+                if (!state.userId || !targetId) return;
 
                 // Delete membership
                 const { error } = await supabase.from('household_members')
                     .delete()
-                    .eq('household_id', state.currentHousehold.id)
+                    .eq('household_id', targetId)
                     .eq('user_id', state.userId);
 
                 if (error) {
-                    console.error('Error leaving household:', error);
                     Alert.alert("Error", "Failed to leave household.");
                     return;
                 }
 
                 // Clear local state
-                set({ currentHousehold: null });
+                const newHouseholds = state.households.filter(h => h.id !== targetId);
+                const newActiveId = state.activeHouseholdId === targetId
+                    ? (newHouseholds.length > 0 ? newHouseholds[0].id : null)
+                    : state.activeHouseholdId;
+
+                set({
+                    households: newHouseholds,
+                    activeHouseholdId: newActiveId
+                });
             },
 
             fetchHouseholdMembers: async () => {
-                // Fetch members for current household
+                // Fetch members for active household
                 const state = get();
-                if (!state.currentHousehold) return;
+                if (!state.activeHouseholdId) return;
 
                 const { data, error } = await supabase
                     .from('household_members')
                     .select('*, profiles:user_id(email, full_name, avatar_url)') // Now relying on public.profiles
-                    .eq('household_id', state.currentHousehold.id);
+                    .eq('household_id', state.activeHouseholdId);
 
                 if (error) {
                     console.error('Error fetching members', error);
@@ -549,20 +643,19 @@ export const useStore = create<AppState>()(
 
                 // Update state
                 set(s => ({
-                    currentHousehold: s.currentHousehold ? {
-                        ...s.currentHousehold,
-                        members: data as any[]
-                    } : null
+                    households: s.households.map(h => h.id === s.activeHouseholdId ? { ...h, members: data as any[] } : h)
                 }));
             },
 
             assignReminder: (reminderId, userId) => {
                 set(state => {
+                    if (!state.activeHouseholdId) return {};
+
                     // Optimistic update
-                    const updated = state.reminders.map(r => r.id === reminderId ? { ...r, assignee_id: userId, household_id: state.currentHousehold?.id } : r);
+                    const updated = state.reminders.map(r => r.id === reminderId ? { ...r, assignee_id: userId, household_id: state.activeHouseholdId || undefined } : r);
 
                     // DB Update
-                    supabase.from('reminders').update({ assignee_id: userId, household_id: state.currentHousehold?.id }).eq('id', reminderId).then(({ error }) => {
+                    supabase.from('reminders').update({ assignee_id: userId, household_id: state.activeHouseholdId }).eq('id', reminderId).then(({ error }) => {
                         if (error) console.error("Error assigning reminder:", error);
                     });
 
@@ -571,9 +664,7 @@ export const useStore = create<AppState>()(
             },
 
             nagMember: (reminderId) => {
-                console.log('Nagging member for reminder:', reminderId);
                 // In real app: Call Edge Function to send push notification
-                // For MVP: Local Alert (handled in UI) or just log
             }
         }),
         {

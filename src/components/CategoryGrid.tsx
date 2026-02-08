@@ -30,12 +30,11 @@ export function CategoryGrid() {
                 "Create unlimited custom lists, unlock icons, and more!",
                 [
                     { text: "Maybe Later", style: "cancel" },
-                    { text: "Upgrade Now", onPress: () => togglePro() } // Simulate upgrade
+                    { text: "Upgrade Now", onPress: () => router.push('/paywall') }
                 ]
             );
         } else {
-            // TODO: Navigate to create category screen or show modal input
-            Alert.alert("Pro Feature", "Category Creation UI coming soon!");
+            router.push('/category/create');
         }
     };
 

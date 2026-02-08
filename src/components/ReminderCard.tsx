@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { ActionSheetIOS, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Colors } from '../constants/Colors';
+import { useStore } from '../store/useStore';
 import { Avatar } from './Avatar';
 import { ThemedText } from './ThemedText';
 
@@ -19,6 +20,21 @@ interface ReminderCardProps {
 }
 
 export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelete, onEdit, householdId, assigneeId }: ReminderCardProps) {
+    const currentHousehold = useStore(state => state.currentHousehold);
+    const userId = useStore(state => state.userId);
+    const nagMember = useStore(state => state.nagMember);
+
+    // Resolve Assignee
+    const assignee = householdId && assigneeId && currentHousehold?.members
+        ? currentHousehold.members.find(m => m.user_id === assigneeId)
+        : null;
+
+    // Fallback name logic: Profile name -> Profile email -> 'Unknown'
+    const assigneeName = assignee?.profile?.full_name?.split(' ')[0]
+        || assignee?.profile?.email?.split('@')[0]
+        || 'Family Member';
+
+    const isMe = assigneeId === userId;
 
     const showActionMenu = () => {
         Haptics.selectionAsync();
@@ -161,18 +177,18 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
             {householdId && assigneeId && (
                 <View style={styles.footer}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Avatar name="Mom" size={24} />
-                        {/* Mock name, ideally pass user object or fetch */}
+                        <Avatar name={assigneeName} size={24} />
                         <ThemedText variant="caption" color={Colors.dark.textSecondary} style={{ marginLeft: 8 }}>
-                            Assigned to Mom
+                            {isMe ? "Assigned to You" : `Assigned to ${assigneeName}`}
                         </ThemedText>
                     </View>
 
-                    {!isCompleted && (
+                    {!isCompleted && !isMe && (
                         <Pressable
                             style={({ pressed }) => [styles.nagButton, pressed && { opacity: 0.7 }]}
                             onPress={() => {
-                                Alert.alert("Nag Sent!", "Mom has been nudged.");
+                                nagMember(id);
+                                Alert.alert("Nudge Sent!", `${assigneeName} has been notified.`);
                                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                             }}
                         >

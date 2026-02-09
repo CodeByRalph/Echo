@@ -5,16 +5,16 @@
     "version": "1.0.0",
     "scheme": "echo",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/Echo_Icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/Echo_Icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "foregroundImage": "./assets/images/Echo_Icon.png",
         "backgroundColor": "#0F172A"
       },
       "package": "com.echo.app"
@@ -31,7 +31,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/images/Echo_Icon.png",
           "color": "#ffffff"
         }
       ],

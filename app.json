@@ -20,6 +20,12 @@
       "package": "com.echo.app"
     },
     "ios": {
+      "icon": "./assets/images/Echo_Icon.png",
+      "splash": {
+        "image": "./assets/images/Echo_Icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#0F172A"
+      },
       "supportsTablet": true,
       "bundleIdentifier": "com.echoreminders.app",
       "infoPlist": {

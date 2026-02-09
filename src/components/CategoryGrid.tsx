@@ -52,10 +52,10 @@ export function CategoryGrid() {
         }
     };
 
-    const CategoryCard = React.memo(({ category, count }: { category: Category; count: number }) => (
+    const CategoryCard = React.memo(({ category, count, onPress }: { category: Category; count: number; onPress: () => void }) => (
         <Pressable
             style={({ pressed }) => [styles.card, pressed && { transform: [{ scale: 0.98 }] }]}
-            onPress={() => router.push(`/category/${category.id}`)}
+            onPress={onPress}
         >
             <View style={[styles.iconContainer, { backgroundColor: category.color + '22' }]}>
                 <Ionicons name={category.icon as any || 'list'} size={16} color={category.color} />
@@ -98,7 +98,12 @@ export function CategoryGrid() {
             <ThemedText variant="h2" weight="semibold" style={{ marginBottom: 12, paddingHorizontal: 20 }}>Lists</ThemedText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 {categories.map(cat => (
-                    <CategoryCard key={cat.id} category={cat} count={getCount(cat.id)} />
+                    <CategoryCard 
+                        key={cat.id} 
+                        category={cat} 
+                        count={getCount(cat.id)} 
+                        onPress={() => router.push(`/category/${cat.id}`)}
+                    />
                 ))}
 
                 {/* New List Button */}

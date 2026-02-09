@@ -1,7 +1,19 @@
 import { Platform } from 'react-native';
 import Purchases, { PurchasesPackage } from 'react-native-purchases';
 
-const API_KEY = 'test_UaGbgyycZMSWByKGNzpUurFFxun'; // Provided Key
+// Get API key from environment variables (EAS secrets) or fallback to test key
+const getRevenueCatApiKey = (): string => {
+    // In production builds, use the key from EAS secrets
+    const productionKey = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY;
+    
+    // Fallback to test key for development
+    const testKey = 'test_UaGbgyycZMSWByKGNzpUurFFxun';
+    
+    // Use production key if available, otherwise fallback to test key
+    return productionKey || testKey;
+};
+
+const API_KEY = getRevenueCatApiKey();
 
 export const PurchaseService = {
     init: async () => {
@@ -11,11 +23,18 @@ export const PurchaseService = {
         }
 
         try {
-            Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+            // Only use DEBUG log level in development
+            if (__DEV__) {
+                Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+            } else {
+                Purchases.setLogLevel(Purchases.LOG_LEVEL.INFO);
+            }
+            
             Purchases.configure({ apiKey: API_KEY });
-            console.log('RevenueCat Configured');
+            console.log('RevenueCat Configured', __DEV__ ? '(Development)' : '(Production)');
         } catch (e) {
             console.error('Error configuring RevenueCat:', e);
+            throw e; // Re-throw to allow error boundary to catch it
         }
     },
 

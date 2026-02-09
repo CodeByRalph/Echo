@@ -47,7 +47,10 @@ Sentry.captureMessage('Test error from Echo app', 'info');
 
 ## Build Configuration
 
-The Sentry Expo plugin is configured in `app.json`. When you build with EAS, Sentry will automatically:
-- Upload source maps
-- Associate releases with errors
-- Track deployment information
+The Sentry Expo plugin is configured in `app.json`. Source map auto-upload is currently disabled to prevent build failures. 
+
+**Note**: Error tracking and crash reporting will still work perfectly without source maps. Source maps just make error stack traces more readable. If you want to enable source map uploads later, you'll need to:
+
+1. Create a Sentry auth token at https://sentry.io/settings/account/api/auth-tokens/
+2. Set it as an EAS secret: `eas secret:create --name SENTRY_AUTH_TOKEN --value your-token`
+3. Update `app.json` to set `"uploadSourceMaps": true` in the Sentry plugin config

@@ -39,7 +39,8 @@
         "@sentry/react-native/expo",
         {
           "organization": "pantheon-industries",
-          "project": "echo"
+          "project": "echo",
+          "uploadSourceMaps": false
         }
       ]
     ],

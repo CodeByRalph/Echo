@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BlurredBottomSheet } from './BlurredBottomSheet';
 import { Colors } from '../constants/Colors';
@@ -15,16 +15,33 @@ export function CategoryGrid() {
     const togglePro = useStore((state) => state.togglePro); // Temp for demo
     const households = useStore((state) => state.households);
     const activeHouseholdId = useStore((state) => state.activeHouseholdId);
-    const currentHousehold = households.find(h => h.id === activeHouseholdId);
+    const currentHousehold = useMemo(() => households.find(h => h.id === activeHouseholdId), [households, activeHouseholdId]);
     const router = useRouter();
     const [showProSheet, setShowProSheet] = useState(false);
 
+    // Memoize counts calculation
+    const categoryCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        const activeReminders = reminders.filter(r => r.status === 'active' && !r.deleted_at);
+        
+        // Count by category_id
+        activeReminders.forEach(r => {
+            if (r.category_id) {
+            counts[r.category_id] = (counts[r.category_id] || 0) + 1;
+            }
+        });
+        
+        // Count family household if exists
+        if (currentHousehold) {
+            counts['family-household'] = activeReminders.filter(r => r.household_id === currentHousehold.id).length;
+        }
+        
+        return counts;
+    }, [reminders, currentHousehold]);
+
     // Calculate counts
     const getCount = (catId: string) => {
-        if (catId === 'family-household') {
-            return reminders.filter(r => currentHousehold && r.household_id === currentHousehold.id && r.status === 'active' && !r.deleted_at).length;
-        }
-        return reminders.filter(r => r.category_id === catId && r.status === 'active' && !r.deleted_at).length;
+        return categoryCounts[catId] || 0;
     };
 
     const handleNewCategory = () => {
@@ -35,7 +52,7 @@ export function CategoryGrid() {
         }
     };
 
-    const CategoryCard = ({ category }: { category: Category }) => (
+    const CategoryCard = React.memo(({ category, count }: { category: Category; count: number }) => (
         <Pressable
             style={({ pressed }) => [styles.card, pressed && { transform: [{ scale: 0.98 }] }]}
             onPress={() => router.push(`/category/${category.id}`)}
@@ -45,11 +62,11 @@ export function CategoryGrid() {
             </View>
             <View style={styles.content}>
                 <ThemedText weight="semibold" style={styles.name}>{category.name}</ThemedText>
-                <ThemedText variant="h2" weight="semibold" style={styles.count}>{getCount(category.id)}</ThemedText>
+                <ThemedText variant="h2" weight="semibold" style={styles.count}>{count}</ThemedText>
                 <ThemedText variant="caption" color={Colors.dark.textSecondary}>active</ThemedText>
             </View>
         </Pressable>
-    );
+    ));
 
     return (
         <View style={styles.container}>
@@ -68,7 +85,7 @@ export function CategoryGrid() {
                             <View style={{ marginLeft: 12 }}>
                                 <ThemedText weight="semibold" style={styles.name}>{currentHousehold.name}</ThemedText>
                                 <ThemedText variant="caption" color={Colors.dark.textSecondary}>
-                                    {getCount('family-household')} active tasks
+                                    {categoryCounts['family-household'] || 0} active tasks
                                 </ThemedText>
                             </View>
                         </View>
@@ -81,7 +98,7 @@ export function CategoryGrid() {
             <ThemedText variant="h2" weight="semibold" style={{ marginBottom: 12, paddingHorizontal: 20 }}>Lists</ThemedText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 {categories.map(cat => (
-                    <CategoryCard key={cat.id} category={cat} />
+                    <CategoryCard key={cat.id} category={cat} count={getCount(cat.id)} />
                 ))}
 
                 {/* New List Button */}

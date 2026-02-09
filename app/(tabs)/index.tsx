@@ -19,18 +19,20 @@ export default function TodayScreen() {
     const isPro = useStore(state => state.isPro);
 
     const sections = useMemo(() => {
-        const today = reminders.filter(r =>
-            r.status === 'active' &&
-            !r.deleted_at &&
-            isToday(r.next_fire_at)
-        );
+        const now = Date.now();
+        const activeReminders = reminders.filter(r => r.status === 'active' && !r.deleted_at);
+        
+        const today: typeof reminders = [];
+        const overdue: typeof reminders = [];
 
-        const overdue = reminders.filter(r =>
-            r.status === 'active' &&
-            !r.deleted_at &&
-            new Date(r.next_fire_at).getTime() < new Date().getTime() &&
-            !isToday(r.next_fire_at)
-        );
+        activeReminders.forEach(r => {
+            const fireTime = new Date(r.next_fire_at).getTime();
+            if (isToday(r.next_fire_at)) {
+                today.push(r);
+            } else if (fireTime < now) {
+                overdue.push(r);
+            }
+        });
 
         const result = [];
         if (overdue.length > 0) result.push({ title: 'Overdue', data: overdue });

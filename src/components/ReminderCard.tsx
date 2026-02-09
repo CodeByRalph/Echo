@@ -21,13 +21,16 @@ interface ReminderCardProps {
     assigneeId?: string;
 }
 
-export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelete, onEdit, householdId, assigneeId }: ReminderCardProps) {
-    const households = useStore(state => state.households);
-    const activeHouseholdId = useStore(state => state.activeHouseholdId);
+export const ReminderCard = React.memo(function ReminderCard({ id, title, time, isCompleted, onComplete, onDelete, onEdit, householdId, assigneeId }: ReminderCardProps) {
+    // Combine store selectors to reduce re-renders
+    const { households, activeHouseholdId, userId, nagMember, snoozePresets } = useStore(state => ({
+        households: state.households,
+        activeHouseholdId: state.activeHouseholdId,
+        userId: state.userId,
+        nagMember: state.nagMember,
+        snoozePresets: state.settings.snooze_presets_mins
+    }));
     const currentHousehold = useMemo(() => households.find(h => h.id === activeHouseholdId), [households, activeHouseholdId]);
-    const userId = useStore(state => state.userId);
-    const nagMember = useStore(state => state.nagMember);
-    const snoozePresets = useStore(state => state.settings.snooze_presets_mins);
     const [sheetMode, setSheetMode] = useState<'actions' | 'snooze' | 'nudge' | null>(null);
     const checkScale = useRef(new Animated.Value(1)).current;
     const enterOpacity = useRef(new Animated.Value(0)).current;
@@ -55,17 +58,21 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
         }
     }, [checkScale, isCompleted]);
 
-    // Resolve Assignee
-    const assignee = householdId && assigneeId && currentHousehold?.members
-        ? currentHousehold.members.find((m) => m.user_id === assigneeId)
-        : null;
+    // Resolve Assignee - memoized to avoid recalculation
+    const { assignee, assigneeName, isMe } = useMemo(() => {
+        const assignee = householdId && assigneeId && currentHousehold?.members
+            ? currentHousehold.members.find((m) => m.user_id === assigneeId)
+            : null;
 
-    // Fallback name logic: Profile name -> Profile email -> 'Unknown'
-    const assigneeName = assignee?.profile?.full_name?.split(' ')[0]
-        || assignee?.profile?.email?.split('@')[0]
-        || 'Family Member';
+        // Fallback name logic: Profile name -> Profile email -> 'Unknown'
+        const assigneeName = assignee?.profile?.full_name?.split(' ')[0]
+            || assignee?.profile?.email?.split('@')[0]
+            || 'Family Member';
 
-    const isMe = assigneeId === userId;
+        const isMe = assigneeId === userId;
+
+        return { assignee, assigneeName, isMe };
+    }, [householdId, assigneeId, currentHousehold, userId]);
 
     const showActionMenu = () => {
         Haptics.selectionAsync();
@@ -216,7 +223,7 @@ export function ReminderCard({ id, title, time, isCompleted, onComplete, onDelet
         />
         </>
     );
-}
+});
 
 
 

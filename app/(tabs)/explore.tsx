@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Layout } from '../../src/components/Layout';
 import { StreamCard } from '../../src/components/StreamCard';
@@ -18,15 +18,15 @@ export default function ExploreScreen() {
 
     useEffect(() => {
         fetchPublicStreams();
-    }, []);
+    }, [fetchPublicStreams]);
 
-    const onRefresh = async () => {
+    const onRefresh = useCallback(async () => {
         setRefreshing(true);
         await fetchPublicStreams();
         setRefreshing(false);
-    };
+    }, [fetchPublicStreams]);
 
-    const handleCreateStream = () => {
+    const handleCreateStream = useCallback(() => {
         if (!isPro) {
             Alert.alert("Echo Pro Required", "Only Pro members can create public community lists.", [
                 { text: "Cancel", style: "cancel" },
@@ -35,12 +35,16 @@ export default function ExploreScreen() {
         } else {
             router.push('/stream/create');
         }
-    };
+    }, [isPro, router]);
 
-    const filteredStreams = publicStreams.filter(s =>
-        s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (s.category && s.category.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const filteredStreams = useMemo(() => {
+        if (!searchQuery.trim()) return publicStreams;
+        const query = searchQuery.toLowerCase();
+        return publicStreams.filter(s =>
+            s.title.toLowerCase().includes(query) ||
+            (s.category && s.category.toLowerCase().includes(query))
+        );
+    }, [publicStreams, searchQuery]);
 
     return (
         <Layout>

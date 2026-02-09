@@ -14,17 +14,8 @@ export function computeNextFireAt(
     baseDueAt: string,
     fromTime: string = new Date().toISOString()
 ): string {
-    console.log('computeNextFireAt called:', {
-        recurrenceType: recurrence.type,
-        recurrenceWeekdays: recurrence.weekdays,
-        recurrenceInterval: recurrence.interval,
-        baseDueAt,
-        fromTime
-    });
-
     const baseDate = new Date(baseDueAt);
     const fromDate = new Date(fromTime);
-    const now = new Date();
 
     // Helper to extract time components from baseDate
     const timeComponents = {
@@ -156,13 +147,6 @@ function matchesRule(date: Date, rule: RecurrenceConfig, baseDate: Date): boolea
         // Our type says 1=Mon...7=Sun. date-fns getDay returns 0..6 (Sun..Sat)
         const isoDay = day === 0 ? 7 : day;
 
-        console.log('matchesRule weekly:', {
-            date: date.toISOString(),
-            isoDay,
-            weekdays: rule.weekdays,
-            hasWeekdays: rule.weekdays && rule.weekdays.length > 0
-        });
-
         // If weekdays is specified, check if current day is in the list
         if (rule.weekdays && rule.weekdays.length > 0) {
             if (rule.weekdays.includes(isoDay)) {
@@ -170,30 +154,21 @@ function matchesRule(date: Date, rule: RecurrenceConfig, baseDate: Date): boolea
                     const diffWeeks = Math.floor((date.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
                     return diffWeeks % rule.interval === 0;
                 }
-                console.log('matchesRule: TRUE (weekdays match)');
                 return true;
             }
-            console.log('matchesRule: FALSE (weekdays no match)');
             return false;
         }
 
         // If weekdays is empty, match the same day of week as baseDate
         const baseDay = getDay(baseDate);
         const baseIsoDay = baseDay === 0 ? 7 : baseDay;
-        console.log('matchesRule weekly (no weekdays):', {
-            baseIsoDay,
-            isoDay,
-            matches: isoDay === baseIsoDay
-        });
         if (isoDay === baseIsoDay) {
             if (rule.interval && rule.interval > 1) {
                 const diffWeeks = Math.floor((date.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
                 return diffWeeks % rule.interval === 0;
             }
-            console.log('matchesRule: TRUE (same day as base)');
             return true;
         }
-        console.log('matchesRule: FALSE (different day)');
         return false;
     }
 

@@ -10,7 +10,7 @@ interface Props {
     onPress: () => void;
 }
 
-export function StreamCard({ stream, onPress }: Props) {
+export const StreamCard = React.memo(function StreamCard({ stream, onPress }: Props) {
     return (
         <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
             <View style={styles.header}>
@@ -46,7 +46,7 @@ export function StreamCard({ stream, onPress }: Props) {
             </View>
         </TouchableOpacity>
     );
-}
+});
 
 const styles = StyleSheet.create({
     container: {

@@ -64,7 +64,7 @@ export default function RootLayout() {
       // Redirect to home if logged in and on login screen
       router.replace('/');
     }
-  }, [session, segments, initialized]);
+  }, [session, segments, initialized, router]);
 
   useEffect(() => {
     // Whenever reminders change, resync notifications.

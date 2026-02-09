@@ -365,11 +365,6 @@ export default function PaywallScreen() {
                             <ThemedText variant="caption" color={Colors.dark.textMuted} style={{ marginTop: 8, textAlign: 'center' }}>
                                 Please check your RevenueCat configuration.
                             </ThemedText>
-                            <Pressable onPress={() => useStore.getState().togglePro()} style={{ marginTop: 20 }}>
-                                <ThemedText variant="caption" color={Colors.dark.textMuted}>
-                                    (Dev: Force Upgrade)
-                                </ThemedText>
-                            </Pressable>
                         </View>
                     )}
 

@@ -49,6 +49,7 @@ export default function TodayScreen() {
                 sections={sections}
                 keyExtractor={item => item.id}
                 contentContainerStyle={{ paddingBottom: 140 }}
+                showsVerticalScrollIndicator={false}
                 ListHeaderComponent={
                     <View style={styles.header}>
                         <View style={styles.topRow}>

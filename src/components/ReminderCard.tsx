@@ -22,14 +22,13 @@ interface ReminderCardProps {
 }
 
 export const ReminderCard = React.memo(function ReminderCard({ id, title, time, isCompleted, onComplete, onDelete, onEdit, householdId, assigneeId }: ReminderCardProps) {
-    // Combine store selectors to reduce re-renders
-    const { households, activeHouseholdId, userId, nagMember, snoozePresets } = useStore(state => ({
-        households: state.households,
-        activeHouseholdId: state.activeHouseholdId,
-        userId: state.userId,
-        nagMember: state.nagMember,
-        snoozePresets: state.settings.snooze_presets_mins
-    }));
+    // Split store selectors to prevent object recreation on every render
+    const households = useStore(state => state.households);
+    const activeHouseholdId = useStore(state => state.activeHouseholdId);
+    const userId = useStore(state => state.userId);
+    const nagMember = useStore(state => state.nagMember);
+    const snoozePresets = useStore(state => state.settings.snooze_presets_mins);
+    
     const currentHousehold = useMemo(() => households.find(h => h.id === activeHouseholdId), [households, activeHouseholdId]);
     const [sheetMode, setSheetMode] = useState<'actions' | 'snooze' | 'nudge' | null>(null);
     const checkScale = useRef(new Animated.Value(1)).current;
@@ -47,7 +46,8 @@ export const ReminderCard = React.memo(function ReminderCard({ id, title, time, 
             Animated.timing(enterOpacity, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
             Animated.timing(enterTranslate, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
         ]).start();
-    }, [enterOpacity, enterTranslate]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only run once on mount - refs don't need to be in deps
 
     useEffect(() => {
         if (isCompleted) {
@@ -56,7 +56,8 @@ export const ReminderCard = React.memo(function ReminderCard({ id, title, time, 
                 Animated.timing(checkScale, { toValue: 1, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
             ]).start();
         }
-    }, [checkScale, isCompleted]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isCompleted]); // checkScale is a ref, doesn't need to be in deps
 
     // Resolve Assignee - memoized to avoid recalculation
     const { assignee, assigneeName, isMe } = useMemo(() => {

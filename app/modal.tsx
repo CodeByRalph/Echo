@@ -67,7 +67,7 @@ export default function ReminderModal() {
 
     return (
         <Layout>
-            <ScrollView contentContainerStyle={styles.container}>
+            <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
                 <View style={styles.section}>
                     <ThemedText variant="label" color={Colors.dark.textSecondary} style={{ marginBottom: 8, letterSpacing: 0.6 }}>WHAT&apos;S THE TASK?</ThemedText>
                     <TextInput

@@ -56,7 +56,7 @@ export default function StreamDetailsScreen() {
                 <ThemedText variant="h1" weight="bold">Stream Details</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <View style={styles.card}>
                     <View style={styles.cardHeader}>
                         <View style={styles.iconContainer}>

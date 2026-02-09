@@ -79,6 +79,7 @@ export default function CategoryDetailScreen() {
                 data={categoryReminders}
                 keyExtractor={item => item.id}
                 contentContainerStyle={{ paddingBottom: 100, paddingTop: 16 }}
+                showsVerticalScrollIndicator={false}
                 ListEmptyComponent={<EmptyState />}
                 renderItem={({ item }) => {
                     // For recurring tasks: completed if last_action='done' AND next occurrence is in the future

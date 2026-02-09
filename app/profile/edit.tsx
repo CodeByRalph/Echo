@@ -36,7 +36,7 @@ export default function EditProfileScreen() {
                 <ThemedText variant="h1" weight="bold">Edit Profile</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
                 {/* Email (Read Only) */}
                 <View style={styles.section}>

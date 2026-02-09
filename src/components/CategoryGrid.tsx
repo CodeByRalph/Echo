@@ -12,7 +12,6 @@ export function CategoryGrid() {
     const categories = useStore((state) => state.categories);
     const reminders = useStore((state) => state.reminders);
     const isPro = useStore((state) => state.isPro);
-    const togglePro = useStore((state) => state.togglePro); // Temp for demo
     const households = useStore((state) => state.households);
     const activeHouseholdId = useStore((state) => state.activeHouseholdId);
     const currentHousehold = useMemo(() => households.find(h => h.id === activeHouseholdId), [households, activeHouseholdId]);
@@ -115,11 +114,6 @@ export function CategoryGrid() {
                 </Pressable>
             </ScrollView>
 
-            {!isPro && (
-                <TouchableOpacity onPress={togglePro} style={{ paddingHorizontal: 20, marginTop: 16 }}>
-                    <ThemedText variant="caption" color={Colors.dark.textMuted} style={{ fontSize: 10 }}>(Dev: Toggle Pro)</ThemedText>
-                </TouchableOpacity>
-            )}
             <BlurredBottomSheet
                 visible={showProSheet}
                 onClose={() => setShowProSheet(false)}

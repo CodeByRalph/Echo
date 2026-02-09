@@ -75,7 +75,7 @@ export default function SnoozeSettingsScreen() {
                 <ThemedText variant="h1" weight="bold">Snooze Settings</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <ThemedText color={Colors.dark.textSecondary} style={{ marginBottom: 24 }}>
                     Customize the quick snooze options that appear when you delay a reminder.
                 </ThemedText>

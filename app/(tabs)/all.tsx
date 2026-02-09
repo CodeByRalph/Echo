@@ -33,6 +33,7 @@ export default function AllScreen() {
                 sections={sections}
                 keyExtractor={item => item.id}
                 contentContainerStyle={{ paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
                 ListHeaderComponent={
                     <View style={styles.header}>
                         <Pressable onPress={() => router.back()} style={styles.backButton}>

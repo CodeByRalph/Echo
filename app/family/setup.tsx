@@ -138,7 +138,7 @@ export default function FamilySetupScreen() {
                 <ThemedText variant="h1" weight="bold" style={{ marginLeft: 12, letterSpacing: -0.4 }}>Family Spaces</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
                 <ThemedText color={Colors.dark.textSecondary} style={{ marginBottom: 24 }}>
                     Sync reminders, assign tasks, and keep your household in the loop.

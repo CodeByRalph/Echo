@@ -104,7 +104,7 @@ export default function CreateStreamScreen() {
                 <ThemedText variant="h1" weight="bold">New Stream</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
                 <ThemedText variant="h3" weight="bold" style={styles.sectionTitle}>Details</ThemedText>
 
                 <View style={styles.inputContainer}>

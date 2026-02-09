@@ -69,6 +69,7 @@ export default function ExploreScreen() {
             <FlatList
                 data={filteredStreams}
                 keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => (
                     <StreamCard
                         stream={item}

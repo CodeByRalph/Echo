@@ -51,7 +51,7 @@ export default function CreateCategoryScreen() {
                 <ThemedText variant="h1" weight="bold">New Folder</ThemedText>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
                 {/* Name Input */}
                 <View style={styles.section}>
